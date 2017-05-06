@@ -4,3 +4,10 @@ mod tests {
     fn it_works() {
     }
 }
+
+mod cgp {
+
+	mod graph;
+	mod nodes;
+
+}
