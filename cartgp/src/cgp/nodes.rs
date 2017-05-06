@@ -24,7 +24,10 @@ fn multiply(x: i64, y: i64) -> i64 {
 
 fn protected_divide(x: i64, y: i64) -> i64 {
 
-	if (y == 0) return f64::INFINITY;
+	if y == 0
+	{
+		return 1000_000_000_000_000
+	}
 	x / y
 
 }
