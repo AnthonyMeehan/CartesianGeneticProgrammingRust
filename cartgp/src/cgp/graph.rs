@@ -16,7 +16,7 @@ struct Triple {
 struct Graph {
 
 	input: Vec<i64>,
-	genome: Vec<Triple>,
+	genome: Vec<Vec<Triple>>,
 	nodes: Vec<fn(i64,i64)>,
 
 }
