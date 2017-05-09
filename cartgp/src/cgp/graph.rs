@@ -5,8 +5,8 @@
 struct Triple {
 
 	function: fn(i64,i64),
-	input_one: i64,
-	input_two: i64,
+	input_one: i32,
+	input_two: i32,
 
 }
 
