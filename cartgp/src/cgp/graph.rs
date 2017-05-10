@@ -4,7 +4,7 @@
 // Contains a function, and two input indexes.
 struct Triple {
 
-	function: fn(i64,i64),
+	function: fn(f64,f64),
 	input_one: i32,
 	input_two: i32,
 
@@ -15,9 +15,9 @@ struct Triple {
 // functions to be used as nodes
 struct Graph {
 
-	input: Vec<i64>,
+	input: Vec<f64>,
 	genome: Vec<Vec<Triple>>,
-	nodes: Vec<fn(i64,i64)>,
+	nodes: Vec<fn(f64,f64)>,
 
 }
 
