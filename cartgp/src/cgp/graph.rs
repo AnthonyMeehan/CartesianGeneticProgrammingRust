@@ -1,4 +1,4 @@
-
+extern crate rand;
 
 // The Triple struct representing a gene
 // Contains a function, and two input indexes.
@@ -23,6 +23,14 @@ struct Graph {
 
 impl Triple {
 
+	// Constructor
+	fn new(function: fn(f64,f64), input_one: i32, input_two: i32) -> Triple {
+		Triple {
+			function: function,
+			input_one: input_one,
+			input_two: input_two,
+		}
+	}
 
 }
 
