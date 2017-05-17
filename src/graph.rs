@@ -6,20 +6,23 @@ use std::cmp;
 type BiFunction = fn(f64,f64) -> f64;
 type FunctionIndex = usize;
 
+#[derive(Clone, Copy)]
 enum NodeIndex {
     InputIndex(usize),
     GeneIndex(usize, usize),
 }
 
 ///Gene Nodes Contain a function index, two input indices, and a possible previously-evaluated result
+#[derive(Clone, Copy)]
 struct GeneNode {
 	function: FunctionIndex, //BiFunction
 	input_node_one: NodeIndex, //Node
 	input_node_two: NodeIndex, //Node
-    output: Option<f64>,
+    //TODO: output: Option<f64>, separate precomputation matrix?
 }
 
 ///Nodes in the graph can be inputs, or gene nodes. "Output" Nodes just reference other nodes on the graph
+#[derive(Clone, Copy)]
 enum Node {
     GeneNode(GeneNode),
     InputNode(f64),
@@ -137,7 +140,8 @@ impl Genome {
             //Input is effectively constant
             &Node::InputNode(input) => input,
             //TODO: Gene may or may not have been evaluated recently
-            &Node::GeneNode(ref gene) => {
+            &Node::GeneNode(ref gene) => self.apply_fn(function_layer, gene, input_layer),
+            /*{
                 match gene.output {
                     //Return recent result
                     Some(result) => result,
@@ -148,7 +152,7 @@ impl Genome {
                         //TODO: Report: Tried precomputing inline, dealing with recursive mutable structures is hard...
                     }
                 }
-            }
+            }*/
         }
     }
 }
@@ -163,7 +167,51 @@ struct Graph {
     genomes: Vec<Genome>,
 }
 
+/*
 impl Graph {
 
 
+}*/
+
+#[test]
+fn test_graph() {
+    let input1 = Node::InputNode(0.0);
+    let input1_i = NodeIndex::InputIndex(0);
+    let input2 = Node::InputNode(1.0);
+    let input2_i = NodeIndex::InputIndex(1);
+
+    fn op1 (x: f64, y: f64) -> f64 { x + y };
+    let op1_i = 0;
+    fn op2 (x: f64, y: f64) -> f64 { x - y };
+    let op2_i = 1;
+
+    let gene1 = Node::GeneNode(GeneNode {
+        function: op1_i,
+        input_node_one: input2_i,
+        input_node_two: input2_i,
+    });
+
+    let gene2 = Node::GeneNode(GeneNode {
+        function: op2_i,
+        input_node_one: input1_i,
+        input_node_two: input2_i,
+    });
+
+    let genome = Genome {
+        inner_layers: vec![vec![gene1, gene2]],
+        output_layer: vec![input1, gene1, gene2],
+    };
+
+    let the_graph = Graph {
+        inputs: vec![input1, input2],
+        functions: vec![op1, op2],
+        genomes: vec![genome],
+    };
+
+    let result1 = the_graph.genomes[0].evaluate(&the_graph.genomes[0].output_layer[0], &the_graph.inputs, &the_graph.functions);
+    let result2 = the_graph.genomes[0].evaluate(&the_graph.genomes[0].output_layer[1], &the_graph.inputs, &the_graph.functions);
+    let result3 = the_graph.genomes[0].evaluate(&the_graph.genomes[0].output_layer[2], &the_graph.inputs, &the_graph.functions);
+    assert_eq!(result1, 0.0);
+    assert_eq!(result2, 2.0);
+    assert_eq!(result3, -1.0);
 }

@@ -10,6 +10,7 @@ mod fitness_fns;
 #[cfg(test)]
 mod tests {
     use fitness_fns;
+    use graph;
 
     #[test]
     fn it_works() {
@@ -30,6 +31,12 @@ mod tests {
         let minus_one: f64 = -1.0;
         assert!(fitness_fns::sin(1.0) == minus_one.sin());
     }*/
+
+
+
+
+
+
 
 
 }

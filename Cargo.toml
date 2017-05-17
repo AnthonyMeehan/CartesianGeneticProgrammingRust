@@ -1,5 +1,5 @@
 [package]
-name = "cgp-rust"
+name = "cgp-rs"
 version = "0.1.1"
 authors = ["Anthony Meehan <acm49@students.waikato.ac.nz>",
            "thegoldencanary <thegoldencanary8@gmail.com>"]
