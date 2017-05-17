@@ -1,7 +1,0 @@
-[package]
-name = "cartgp"
-version = "0.1.0"
-authors = ["thegoldencanary <thegoldencanary8@gmail.com>"]
-
-[dependencies]
-rand = "0.3"
