@@ -88,6 +88,16 @@ struct Genome {
 
 
 impl Genome {
+
+	fn new(x: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, input_layer: Layer) -> Genome {
+		
+		inner: Vec<Layer>::new(x-1);
+		outer: Layer::new(outputs);
+		
+		
+		
+	}
+
     /// Pick a random node from some layer N to N-layers_back (not including N).
     /// Since nodes aren't chosen from N, N can be equal to number of function_layers,
     /// i.e. for output layer.
@@ -176,32 +186,24 @@ impl Graph {
     }
 	
 	// Builds a random graph from input and function set
-	fn build(&self, x: i32, y: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, inputs: &Vec<f64>, layers_back: i32) -> Graph {
+	fn new(&self, x: i32, y: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, inputs: &Vec<f64>, layers_back: i32) -> Graph {
 		
 		input_layer: Layer::new(inputs.len());
 		for input in inputs {
 			input_layer.push(InputNode(input));
 		}
 		
-		genomes: Vec<Genome>::new(y);
+		population: Vec<Genome>::new(y);
 		
 		for y_value in 0..y {
-		
-			internal: Vec<Layer>::new(x-1);
-			external: Layer;
-		
-			for layer in internal{
-				for i in 0..z {
-					
-				}
-			}
+			genomes.push(Genome::new(x,z,outputs,function_set,input_layer))
 		}
 		
 		Graph {
 		
 			inputs: input_layer,
 			functions: function_set,
-			
+			genomes: population,
 		
 		}
 		
