@@ -28,6 +28,18 @@ enum Node {
     InputNode(f64),
 }
 
+impl GeneNode {
+
+	fn new(previous_layer_size: usize,layer: usize,function_set: &Vec<BiFunction>) {
+		GeneNode {
+			function: ThreadRng.gen_range(0, function_set.len(),
+			input_node_one:  GeneIndex(layer,ThreadRng.gen_range(0, function_set.len()),
+			input_node_two: GeneIndex(layer,ThreadRng.gen_range(0, function_set.len()),
+		}
+	}
+
+}
+
 impl Node {
 
     // Constructor
@@ -94,7 +106,27 @@ impl Genome {
 		inner: Vec<Layer>::new(x-1);
 		outer: Layer::new(outputs);
 		
+		for i in 0..x-1 {
+			l: Layer::new(z);
+			previous: Layer;
+			if (i == 0) {
+				previous = input_layer;
+			}else {
+				previous = inner[i-1]; 
+			}
+			for node in 0..z {
+				l.push(GeneNode::new(previous.len(),i,&function_set));
+			}
+			inner.push(l);
+		}
+		for i in 0..outputs {
+			outer.push(GeneNode::new(inner[inner.len()-1].len(),i,&function_set));
+		}
 		
+		Genome {
+			inner_layers: inner,
+			output_layer: output,
+		}
 		
 	}
 
