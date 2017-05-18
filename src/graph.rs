@@ -30,6 +30,8 @@ enum Node {
 
 impl GeneNode {
 
+	// Constructor for setting random node
+	// previous_layer_size and layer determine bounds for connections
 	fn new(previous_layer_size: usize,layer: usize,function_set: &Vec<BiFunction>) {
 		GeneNode {
 			function: ThreadRng.gen_range(0, function_set.len(),
@@ -101,11 +103,15 @@ struct Genome {
 
 impl Genome {
 
+	// Constructor for setting random genome
+	// x, z, outputs define size
+	// function_set is the vector of functions to use
+	// inputs is the input vector
 	fn new(x: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, input_layer: Layer) -> Genome {
 		
+		// Set layers
 		inner: Vec<Layer>::new(x-1);
 		outer: Layer::new(outputs);
-		
 		for i in 0..x-1 {
 			l: Layer::new(z);
 			previous: Layer;
@@ -218,15 +224,21 @@ impl Graph {
     }
 	
 	// Builds a random graph from input and function set
+	// x, y, z define graph dimensions
+	// outputs defines number of outputs
+	// function_set is the vector of functions to use
+	// inputs is the input vector
+	// layers back defines the layers back parameter
 	fn new(&self, x: i32, y: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, inputs: &Vec<f64>, layers_back: i32) -> Graph {
 		
+		// Build input layer
 		input_layer: Layer::new(inputs.len());
 		for input in inputs {
 			input_layer.push(InputNode(input));
 		}
 		
+		// Build random Genomes
 		population: Vec<Genome>::new(y);
-		
 		for y_value in 0..y {
 			genomes.push(Genome::new(x,z,outputs,function_set,input_layer))
 		}
