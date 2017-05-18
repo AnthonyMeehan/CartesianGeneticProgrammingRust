@@ -15,9 +15,9 @@ enum NodeIndex {
 ///Gene Nodes Contain a function index, two input indices, and a possible previously-evaluated result
 #[derive(Clone, Copy)]
 struct GeneNode {
-	function: FunctionIndex, //BiFunction
-	input_node_one: NodeIndex, //Node
-	input_node_two: NodeIndex, //Node
+    function: FunctionIndex, //BiFunction
+    input_node_one: NodeIndex, //Node
+    input_node_two: NodeIndex, //Node
     //TODO: output: Option<f64>, separate precomputation matrix?
 }
 
@@ -106,12 +106,14 @@ impl Genome {
             let node_index = random_generator.gen_range(0, input_layer.len());
             return NodeIndex::InputIndex(node_index);
         }
-        else {
-            //choose a node index from some internal layer
-            let node_index = random_generator.gen_range(0, self.inner_layers[layer_index as usize].len());
-            return NodeIndex::GeneIndex(layer_index as usize, node_index);
-        }
+            else {
+                //choose a node index from some internal layer
+                let node_index = random_generator.gen_range(0, self.inner_layers[layer_index as usize].len());
+                return NodeIndex::GeneIndex(layer_index as usize, node_index);
+            }
     }
+
+
 
     /*
     fn mutate_nodes(&self) {
@@ -158,20 +160,22 @@ impl Genome {
 }
 
 // The Graph struct containing the list of genes
-// and the input into the Graph, and a list of 
+// and the input into the Graph, and a list of
 // functions to be used as nodes
 struct Graph {
-	inputs: Layer,
+    inputs: Layer,
     //TODO: constants: Vec<f64>,
     functions: Vec<BiFunction>,
     genomes: Vec<Genome>,
 }
 
-/*
+
 impl Graph {
+    fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
+        return random_generator.gen_range(0, self.functions.len());
+    }
 
-
-}*/
+}
 
 #[test]
 fn test_graph() {
