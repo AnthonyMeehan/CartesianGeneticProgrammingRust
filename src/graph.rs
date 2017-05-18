@@ -174,6 +174,38 @@ impl Graph {
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
     }
+	
+	// Builds a random graph from input and function set
+	fn build(&self, x: i32, y: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, inputs: &Vec<f64>, layers_back: i32) -> Graph {
+		
+		input_layer: Layer::new(inputs.len());
+		for input in inputs {
+			input_layer.push(InputNode(input));
+		}
+		
+		genomes: Vec<Genome>::new(y);
+		
+		for y_value in 0..y {
+		
+			internal: Vec<Layer>::new(x-1);
+			external: Layer;
+		
+			for layer in internal{
+				for i in 0..z {
+					
+				}
+			}
+		}
+		
+		Graph {
+		
+			inputs: input_layer,
+			functions: function_set,
+			
+		
+		}
+		
+	}
 
 }
 
