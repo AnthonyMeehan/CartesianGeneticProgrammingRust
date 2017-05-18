@@ -32,11 +32,14 @@ impl GeneNode {
 
 	// Constructor for setting random node
 	// previous_layer_size and layer determine bounds for connections
-	fn new(previous_layer_size: usize,layer: usize,function_set: &Vec<BiFunction>) {
+	fn new(previous_layer_size: usize,layer: usize,function_set: &Vec<BiFunction>) -> GeneNode {
+		
+		let &mut random_generator = ThreadRng;
+	
 		GeneNode {
-			function: ThreadRng.gen_range(0, function_set.len(),
-			input_node_one:  GeneIndex(layer,ThreadRng.gen_range(0, function_set.len()),
-			input_node_two: GeneIndex(layer,ThreadRng.gen_range(0, function_set.len()),
+			function: ThreadRng.gen_range(0, function_set.len()),
+			input_node_one:  (layer,random_generator.gen_range(0, function_set.len()) as usize),
+			input_node_two: (layer,random_generator.gen_range(0, function_set.len()) as usize),
 		}
 	}
 
@@ -110,18 +113,18 @@ impl Genome {
 	fn new(x: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, input_layer: Layer) -> Genome {
 		
 		// Set layers
-		inner: Vec<Layer>::new(x-1);
-		outer: Layer::new(outputs);
+		let mut inner = Vec::<Layer>::new();
+		let mut outer = Layer::new();
 		for i in 0..x-1 {
-			l: Layer::new(z);
-			previous: Layer;
-			if (i == 0) {
+			let mut l = Layer::new();
+			let mut previous = Layer::new();
+			if i == 0 {
 				previous = input_layer;
 			}else {
 				previous = inner[i-1]; 
 			}
 			for node in 0..z {
-				l.push(GeneNode::new(previous.len(),i,&function_set));
+				l.push(GeneNode::new(previous.len(),i as usize,&function_set));
 			}
 			inner.push(l);
 		}
@@ -131,7 +134,7 @@ impl Genome {
 		
 		Genome {
 			inner_layers: inner,
-			output_layer: output,
+			output_layer: outer,
 		}
 		
 	}
@@ -232,15 +235,15 @@ impl Graph {
 	fn new(&self, x: i32, y: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, inputs: &Vec<f64>, layers_back: i32) -> Graph {
 		
 		// Build input layer
-		input_layer: Layer::new(inputs.len());
+		let mut input_layer = Layer::new();
 		for input in inputs {
-			input_layer.push(InputNode(input));
+			input_layer.push(input);
 		}
 		
 		// Build random Genomes
-		population: Vec<Genome>::new(y);
+		let mut population = Vec::<Genome>::new();
 		for y_value in 0..y {
-			genomes.push(Genome::new(x,z,outputs,function_set,input_layer))
+			population.push(Genome::new(x,z,outputs,function_set,input_layer))
 		}
 		
 		Graph {
