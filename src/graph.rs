@@ -315,4 +315,20 @@ fn test_graph() {
     assert_eq!(result1, 0.0);
     assert_eq!(result2, 2.0);
     assert_eq!(result3, -1.0);
+	
+	
+	let inp = vec![1.0,0.3,0.4];
+	let fns = [op1,op2].to_vec();
+	let new_graph = GraphBuilder::new(5)
+	.addInput(inp)
+	.addHidden(8)
+	.addHidden(4)
+	.addOutput(2)
+	.addFunctions(fns)
+	.levels(2)
+	.build();
+	
+	let result1 = new_graph.genomes[0].evaluate(&new_graph.genomes[0].output_layer[0], &new_graph.inputs, &new_graph.functions);
+	assert_eq!(result1,2.0);
+	
 }
