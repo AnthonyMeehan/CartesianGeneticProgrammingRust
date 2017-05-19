@@ -28,23 +28,6 @@ enum Node {
     InputNode(f64),
 }
 
-impl GeneNode {
-
-	// Constructor for setting random node
-	// previous_layer_size and layer determine bounds for connections
-	fn new(previous_layer_size: usize,layer: usize,function_set: &Vec<BiFunction>) -> GeneNode {
-		
-		let &mut random_generator = ThreadRng;
-	
-		GeneNode {
-			function: ThreadRng.gen_range(0, function_set.len()),
-			input_node_one:  (layer,random_generator.gen_range(0, function_set.len()) as usize),
-			input_node_two: (layer,random_generator.gen_range(0, function_set.len()) as usize),
-		}
-	}
-
-}
-
 impl Node {
 
     // Constructor
@@ -105,39 +88,6 @@ struct Genome {
 
 
 impl Genome {
-
-	// Constructor for setting random genome
-	// x, z, outputs define size
-	// function_set is the vector of functions to use
-	// inputs is the input vector
-	fn new(x: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, input_layer: Layer) -> Genome {
-		
-		// Set layers
-		let mut inner = Vec::<Layer>::new();
-		let mut outer = Layer::new();
-		for i in 0..x-1 {
-			let mut l = Layer::new();
-			let mut previous = Layer::new();
-			if i == 0 {
-				previous = input_layer;
-			}else {
-				previous = inner[i-1]; 
-			}
-			for node in 0..z {
-				l.push(GeneNode::new(previous.len(),i as usize,&function_set));
-			}
-			inner.push(l);
-		}
-		for i in 0..outputs {
-			outer.push(GeneNode::new(inner[inner.len()-1].len(),i,&function_set));
-		}
-		
-		Genome {
-			inner_layers: inner,
-			output_layer: outer,
-		}
-		
-	}
 
     /// Pick a random node from some layer N to N-layers_back (not including N).
     /// Since nodes aren't chosen from N, N can be equal to number of function_layers,
@@ -225,37 +175,31 @@ impl Graph {
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
     }
-	
-	// Builds a random graph from input and function set
-	// x, y, z define graph dimensions
-	// outputs defines number of outputs
-	// function_set is the vector of functions to use
-	// inputs is the input vector
-	// layers back defines the layers back parameter
-	fn new(&self, x: i32, y: i32, z: i32, outputs: i32, function_set: &Vec<BiFunction>, inputs: &Vec<f64>, layers_back: i32) -> Graph {
-		
-		// Build input layer
-		let mut input_layer = Layer::new();
-		for input in inputs {
-			input_layer.push(input);
-		}
-		
-		// Build random Genomes
-		let mut population = Vec::<Genome>::new();
-		for y_value in 0..y {
-			population.push(Genome::new(x,z,outputs,function_set,input_layer))
-		}
-		
-		Graph {
-		
-			inputs: input_layer,
-			functions: function_set,
-			genomes: population,
-		
-		}
-		
-	}
+}
 
+struct GraphBuilder {
+	inputs: Layer,
+	functions: Vec<BiFunction>,
+	hidden_layers: Vec<Layer>,
+	output: Layer,
+}
+
+impl GraphBuilder {/*
+	fn new(genomes: i32) -> GraphBuilder {
+	
+	}
+	fn addInput(input: &Vec<f64>) -> GraphBuilder {
+	
+	}
+	fn addHidden(size: i32) -> GraphBuilder {
+	
+	}
+	fn addOutput(size: i32) -> GraphBuilder {
+	
+	}
+	fn build() -> Graph {
+	
+	}*/
 }
 
 #[test]
