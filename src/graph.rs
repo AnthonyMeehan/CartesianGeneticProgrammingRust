@@ -170,7 +170,6 @@ struct Graph {
     genomes: Vec<Genome>,
 }
 
-
 impl Graph {
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
@@ -178,28 +177,101 @@ impl Graph {
 }
 
 struct GraphBuilder {
+	genome_count: i32,
 	inputs: Layer,
 	functions: Vec<BiFunction>,
 	hidden_layers: Vec<Layer>,
 	output: Layer,
+	levels: usize,
 }
 
-impl GraphBuilder {/*
+/*
+	Graph builder
+		new(genomes) initializes builder with given genome count.
+		methods are:
+			addInput(input vector) adds input vector 
+			addFunctions(function vector) adds functions
+			addHidden(size) adds a hidden layer of given size
+			addOutput(size) adds an output layer of given size
+			levels(levels_back) sets levels back
+			build() builds graph from GraphBuilder
+			
+	TODO: Force restraints on configuration (ex. one output layer)
+*/
+impl GraphBuilder {
 	fn new(genomes: i32) -> GraphBuilder {
-	
+		GraphBuilder {
+			inputs: Layer::new(),
+			functions: Vec::new(),
+			hidden_layers: Vec::new(),
+			output: Layer::new(),
+			genome_count: genomes,
+			levels: 1,
+		}
 	}
-	fn addInput(input: &Vec<f64>) -> GraphBuilder {
-	
+	fn addInput(&mut self,input: Vec<f64>) -> &mut GraphBuilder {
+		for x in input {
+			self.inputs.push(Node::InputNode(x));
+		}
+		self
 	}
-	fn addHidden(size: i32) -> GraphBuilder {
-	
+	fn addHidden(&mut self,size: i32) -> &mut GraphBuilder {
+		self.hidden_layers.push(Layer::new());
+		let length: usize = self.hidden_layers.len()-1;
+		for index in 0..size {
+			self.hidden_layers[length].push(Node::GeneNode(GeneNode {
+				function: 0, //BiFunction
+				input_node_one: NodeIndex::InputIndex(0), //Node
+				input_node_two: NodeIndex::InputIndex(0), //Node
+			}
+			));
+		}
+		self
 	}
-	fn addOutput(size: i32) -> GraphBuilder {
-	
+	fn addOutput(&mut self,size: i32) -> &mut GraphBuilder {
+		self.output = Layer::new();
+		for index in 0..size {
+			self.output.push(Node::GeneNode(GeneNode {
+				function: 0, //BiFunction
+				input_node_one: NodeIndex::InputIndex(0), //Node
+				input_node_two: NodeIndex::InputIndex(0), //Node
+			}
+			));
+		}
+		self
 	}
-	fn build() -> Graph {
-	
-	}*/
+	fn addFunctions(&mut self, funcs: Vec<BiFunction>) -> &mut GraphBuilder{
+		self.functions = funcs;
+		self
+	}
+	fn levels(&mut self, levels: usize) -> &mut GraphBuilder {
+		self.levels = levels;
+		self
+	}
+	fn build(&mut self) -> Graph {
+		let mut g = Vec::new();
+		for index in 0..self.genome_count {
+			let mut gene = Genome {
+
+				inner_layers: Vec::new(),
+				output_layer: Layer::new(),
+			
+			};
+			gene.inner_layers = self.hidden_layers.clone();
+			gene.output_layer = self.output.clone();
+			g.push(gene);
+		}
+		let mut graph = Graph {
+			inputs: self.inputs.clone(),
+			functions: self.functions.clone(),
+			genomes: g,
+		};
+		
+		// TODO: randomize
+		
+		let graph = graph;
+		graph
+	}
 }
 
 #[test]
