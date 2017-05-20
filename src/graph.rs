@@ -6,14 +6,14 @@ use std::cmp;
 type BiFunction = fn(f64,f64) -> f64;
 type FunctionIndex = usize;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy,Debug)]
 enum NodeIndex {
     InputIndex(usize),
     GeneIndex(usize, usize),
 }
 
 ///Gene Nodes Contain a function index, two input indices, and a possible previously-evaluated result
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy,Debug)]
 struct GeneNode {
     function: FunctionIndex, //BiFunction
     input_node_one: NodeIndex, //Node
@@ -22,7 +22,7 @@ struct GeneNode {
 }
 
 ///Nodes in the graph can be inputs, or gene nodes. "Output" Nodes just reference other nodes on the graph
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy,Debug)]
 enum Node {
     GeneNode(GeneNode),
     InputNode(f64),
@@ -80,7 +80,7 @@ impl Node {
 }
 
 type Layer = Vec<Node>;
-
+#[derive(Debug)]
 struct Genome {
     inner_layers: Vec<Layer>,
     output_layer: Layer,
@@ -163,6 +163,7 @@ impl Genome {
 // The Graph struct containing the list of genes
 // and the input into the Graph, and a list of
 // functions to be used as nodes
+#[derive(Debug)]
 struct Graph {
     inputs: Layer,
     //TODO: constants: Vec<f64>,
@@ -267,8 +268,84 @@ impl GraphBuilder {
 			genomes: g,
 		};
 		
-		// TODO: randomize
+		let function_len = graph.functions.len();
+		let input_len = graph.inputs.len();
+		let layers_back = self.levels;
 		
+		let mut layer_lens = Vec::new();
+		let graph = graph;
+		for layer in &(graph.genomes[0].inner_layers) {
+			layer_lens.push(layer.len());
+		}
+		let layer_lens = layer_lens;
+		let mut graph = graph;
+		
+		// TODO: randomize
+		for mut genome in &mut graph.genomes {
+
+			for mut gene in &mut genome.inner_layers[0] {
+				*gene = Node::GeneNode( GeneNode {
+					input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)), 
+					input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+					function: rand::thread_rng().gen_range(0, function_len),
+				});
+			}
+			
+			for index in 1..(genome.inner_layers.len()) {
+			
+				for mut gene in &mut genome.inner_layers[index] {
+				
+					// TODO: Allow genes to connect to both an input and gene node
+					let back = if layers_back != 1 {
+						rand::thread_rng().gen_range(1, layers_back)
+					}else {
+						1
+					};
+					let to_layer: isize = cmp::max(-1, (index as isize) - (back as isize));
+					if to_layer < 0 {
+						let to_layer = to_layer as usize;
+						*gene = Node::GeneNode( GeneNode {
+						input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)), 
+						input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+						function: rand::thread_rng().gen_range(0, function_len),
+						});
+					}else {
+						let to_layer = to_layer as usize;
+						*gene = Node::GeneNode( GeneNode {
+						input_node_one: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 
+						input_node_two: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 		
+						function: rand::thread_rng().gen_range(0, function_len),
+						});
+					}
+				}
+			}
+			for mut gene in &mut genome.output_layer {
+			
+				// TODO: Allow genes to connect to both an input and gene node
+				let index = layer_lens.len();
+				let back = if layers_back != 1 {
+						rand::thread_rng().gen_range(1, layers_back)
+					}else {
+						1
+					};
+				let to_layer: isize = cmp::max(-1, (index as isize) - (back as isize));
+				if to_layer < 0 {
+					let to_layer = to_layer as usize;
+					*gene = Node::GeneNode( GeneNode {
+					input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)), 
+					input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+					function: rand::thread_rng().gen_range(0, function_len),
+					});
+				}else {
+					let to_layer = to_layer as usize;
+					*gene = Node::GeneNode( GeneNode {
+					input_node_one: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 
+					input_node_two: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 		
+					function: rand::thread_rng().gen_range(0, function_len),
+					});
+				}
+			}
+		}
 		let graph = graph;
 		graph
 	}
@@ -325,10 +402,8 @@ fn test_graph() {
 	.addHidden(4)
 	.addOutput(2)
 	.addFunctions(fns)
-	.levels(2)
+	.levels(1)
 	.build();
-	
+	 
 	let result1 = new_graph.genomes[0].evaluate(&new_graph.genomes[0].output_layer[0], &new_graph.inputs, &new_graph.functions);
-	assert_eq!(result1,2.0);
-	
 }
