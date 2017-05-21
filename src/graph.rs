@@ -117,8 +117,22 @@ impl Genome {
 
 
     /*
-    fn mutate_nodes(&self) {
-
+    fn mutate_nodes(&self, thread_rng: &mut ThreadRng, expected_muts: usize) {
+		
+		let mut nodes: usize = self.output_layer.len();
+		for x in inner_layers {
+			nodes = nodes + x.len();
+		}
+		let mut_chance = expected_muts / nodes;
+		for mut layer in &mut (self.inner_layers) {
+			for mut node in layer {
+				if thread_rng.gen::<f64>() < mut_chance {
+					// MUTATE
+					
+				}
+			}
+		}
+		
     }*/
 
     fn apply_fn(&self, function_layer: &Vec<BiFunction>, gene: &GeneNode, input_layer: &Layer) -> f64 {
@@ -394,16 +408,31 @@ fn test_graph() {
     assert_eq!(result3, -1.0);
 	
 	
-	let inp = vec![1.0,0.3,0.4];
+	let inp = vec![0.1,0.2,0.3,0.4];
 	let fns = [op1,op2].to_vec();
-	let new_graph = GraphBuilder::new(5)
+	let new_graph = GraphBuilder::new(10)
 	.addInput(inp)
+	.addHidden(32)
+	.addHidden(16)
 	.addHidden(8)
 	.addHidden(4)
-	.addOutput(2)
+	.addHidden(2)
+	.addOutput(1)
 	.addFunctions(fns)
 	.levels(1)
 	.build();
-	 
+
 	let result1 = new_graph.genomes[0].evaluate(&new_graph.genomes[0].output_layer[0], &new_graph.inputs, &new_graph.functions);
+	
 }
+
+
+
+
+
+
+
+
+
+
+
