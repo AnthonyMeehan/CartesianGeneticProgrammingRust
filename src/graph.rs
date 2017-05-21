@@ -128,7 +128,11 @@ impl Genome {
 			for mut node in layer {
 				if thread_rng.gen::<f64>() < mut_chance {
 					// MUTATE
-					
+					match thread_rng.gen_range(0, 3) {
+						0 => node.input_node_one = ,
+						1 => node.input_node_two = ,
+						2 => node.function = ,
+					}
 				}
 			}
 		}
