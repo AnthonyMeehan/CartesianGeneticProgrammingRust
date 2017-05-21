@@ -116,28 +116,45 @@ impl Genome {
 
 
 
-    /*
-    fn mutate_nodes(&self, thread_rng: &mut ThreadRng, expected_muts: usize) {
+    
+	//Gets messy with now adding length of input layer, layers back 
+	/*
+    fn mutate_nodes(&self, thread_rng: &mut ThreadRng, expected_muts: usize, input: &Layer, layers_back: usize, f: &Vec<BiFunction>) {
 		
 		let mut nodes: usize = self.output_layer.len();
-		for x in inner_layers {
+		for x in self.inner_layers {
 			nodes = nodes + x.len();
 		}
-		let mut_chance = expected_muts / nodes;
-		for mut layer in &mut (self.inner_layers) {
+		let mut_chance: f64 = (expected_muts as f64) / (nodes as f64);
+		for index in 0..self.inner_layers.len() {
+			let mut layer = &mut self.inner_layers[index];
 			for mut node in layer {
 				if thread_rng.gen::<f64>() < mut_chance {
 					// MUTATE
+					
 					match thread_rng.gen_range(0, 3) {
-						0 => node.input_node_one = ,
-						1 => node.input_node_two = ,
-						2 => node.function = ,
+						0 => node.input_node_one = self.get_random_node(index,layers_back,input,thread_rng),
+						1 => node.input_node_two = self.get_random_node(index,layers_back,input,thread_rng),
+						2 => node.function = thread_rng.choose(f),
 					}
 				}
 			}
 		}
-		
-    }*/
+		let index = self.inner_layers.len();
+		let mut layer = &mut self.output_layer;
+		for mut node in layer {
+			if thread_rng.gen::<f64>() < mut_chance {
+				// MUTATE
+				
+				match thread_rng.gen_range(0, 3) {
+					0 => node.input_node_one = self.get_random_node(index,layers_back,input,thread_rng),
+					1 => node.input_node_two = self.get_random_node(index,layers_back,input,thread_rng),
+					2 => node.function = thread_rng.choose(f),
+				}
+			}
+		}	
+    }
+	*/
 
     fn apply_fn(&self, function_layer: &Vec<BiFunction>, gene: &GeneNode, input_layer: &Layer) -> f64 {
         //Evaluate new result recursively
