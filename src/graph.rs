@@ -220,6 +220,25 @@ impl Graph {
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
     }
+	/*
+	Won't work yet due to mutable stuff, and there is no genome.error!
+	fn update(&mut self,expected_muts: usize, layers_back: usize) {
+		let mut max = 0.0;
+		let mut max_genome = 0;
+		for (index,genome) in self.genomes.iter().enumerate() {
+			let result = genome.error();
+			if result > max:
+				max = result;
+				max_genome = index;
+		}
+		for (index,genome) in self.genomes.iter().enumerate() {
+			if index != max_genome {
+				genome = self.genomes[max_genome].clone();
+				genome.mutate_nodes(expected_muts, self.inputs, layers_back, self.functions.len());
+			}
+		}
+	}
+	*/
 }
 
 struct GraphBuilder {
