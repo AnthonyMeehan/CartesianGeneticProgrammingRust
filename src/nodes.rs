@@ -4,25 +4,19 @@
 	Node functions
 */
 
-fn add(x: i64, y: i64) -> i64 {
-
+fn add(x: f64, y: f64) -> f64 {
 	x + y
-
 }
 
-fn subtract(x: i64, y: i64) -> i64 {
-
+fn subtract(x: f64, y: f64) -> f64 {
 	x - y
-
 }
 
-fn multiply(x: i64, y: i64) -> i64 {
-
+fn multiply(x: f64, y: f64) -> f64 {
 	x * y
-
 }
 
-fn protected_divide(x: i64, y: i64) -> i64 {
+fn protected_divide(x: f64, y: f64) -> f64 {
 
 	if y == 0
 	{
@@ -31,3 +25,4 @@ fn protected_divide(x: i64, y: i64) -> i64 {
 	x / y
 
 }
+
