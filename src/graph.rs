@@ -22,7 +22,7 @@ struct GeneNode {
 }
 
 ///Nodes in the graph can be inputs, or gene nodes. "Output" Nodes just reference other nodes on the graph
-#[derive(Clone, Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 enum Node {
     GeneNode(GeneNode),
     InputNode(f64),
@@ -83,12 +83,11 @@ type Layer = Vec<Node>;
 #[derive(Debug)]
 struct Genome {
     inner_layers: Vec<Layer>,
-    output_layer: Layer,
+    output_layer: Vec<NodeIndex>, //TODO: was just 'Layer' before
 }
 
 
 impl Genome {
-
     /// Pick a random node from some layer N to N-layers_back (not including N).
     /// Since nodes aren't chosen from N, N can be equal to number of function_layers,
     /// i.e. for output layer.
@@ -100,90 +99,153 @@ impl Genome {
         //If layers_back > from_layer, counteract bias towards input nodes
         let to_layer: isize = cmp::max(-1, (from_layer as isize) - (layers_back as isize));
 
-        let layer_index : isize = random_generator.gen_range(to_layer, from_layer as isize);
+        let layer_index: isize = random_generator.gen_range(to_layer, from_layer as isize);
 
         if layer_index < 0 {
             //choose a node index from the input layer
             let node_index = random_generator.gen_range(0, input_layer.len());
             return NodeIndex::InputIndex(node_index);
+        } else {
+            //choose a node index from some internal layer
+            let node_index = random_generator.gen_range(0, self.inner_layers[layer_index as usize].len());
+            return NodeIndex::GeneIndex(layer_index as usize, node_index);
         }
-            else {
-                //choose a node index from some internal layer
-                let node_index = random_generator.gen_range(0, self.inner_layers[layer_index as usize].len());
-                return NodeIndex::GeneIndex(layer_index as usize, node_index);
+    }
+
+    fn new_mutate_node(&mut self, input_layer: &Layer, layers_back: usize, output_probability: f64, num_functions: usize, random_generator: &mut ThreadRng) {
+        let layer_index: usize = random_generator.gen_range(0, self.inner_layers.len()+1);
+
+        //if layer_index == self.inner_layers.len() { //TODO: check on output prob instead
+        if random_generator.gen_range(0.0, 1.0) < output_probability {
+            //mutate an output connection
+            let output_index: usize = random_generator.gen_range(0, self.output_layer.len());
+            self.output_layer[output_index] = self.get_random_node(self.inner_layers.len(), layers_back, input_layer, random_generator);
+        }
+        else {
+            //mutate an internal node
+            let layer_index: usize = random_generator.gen_range(0, self.inner_layers.len());
+            let node_index: usize = random_generator.gen_range(0, self.inner_layers[layer_index].len());
+            let node_to_mutate: Node = self.inner_layers[layer_index][node_index];
+            match node_to_mutate {
+                Node::GeneNode(gene) => {
+                    //pick between function and two inputs
+                    match random_generator.gen_range(0, 3) {
+                        //function: pick index from a list of functions //TODO: Use the list directly?
+                        0 => gene.function = random_generator.gen_range(0, num_functions),
+                        1 => gene.input_node_one = self.get_random_node(layer_index, layers_back, input_layer, random_generator),
+                        2 => gene.input_node_two = self.get_random_node(layer_index, layers_back, input_layer, random_generator),
+                    }
+                }
+                Node::InputNode(_) => panic!("Expected GeneNode in internal layer, got Input instead")
             }
+        }
+
+            /*
+        if layer_index < 0 {
+            //choose a node index from the input layer
+            let node_index = random_generator.gen_range(0, input_layer.unwrap().len());
+            return NodeIndex::InputIndex(node_index);
+        } else {
+            //choose a node index from some internal layer
+            let node_index = random_generator.gen_range(0, self.inner_layers[layer_index as usize].len());
+            return NodeIndex::GeneIndex(layer_index as usize, node_index);
+        }*/
     }
-    
-	//Gets messy with now adding length of input layer, layers back 
-    fn mutate_nodes(&self, expected_muts: usize, input: &Layer, layers_back: usize, f: usize) -> Genome{
-		
-		let mut hacks = Genome {
-		inner_layers: self.inner_layers.clone(),
-		output_layer: self.output_layer.clone(),};
-		
-		let mut nodes: usize = self.output_layer.len();
-		for x in &(self.inner_layers) {
-			nodes = nodes + x.len();
-		}
-		
-		let mutation_chance: f64 = (expected_muts as f64) / (nodes as f64);
-		
-		for index in 0..hacks.inner_layers.len() {
-			let mut x = &mut (hacks.inner_layers[index]);
-			for mut node in x {
-				if rand::thread_rng().gen::<f64>() < mutation_chance {
-					let value = rand::thread_rng().gen_range(0,3);
-					match node {
-						&mut Node::GeneNode(ref mut gene) => 
-						match value {
-							0 => gene.input_node_one = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
-							1 => gene.input_node_two = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
-							2 => gene.function = rand::thread_rng().gen_range(0, f),
-							_ => panic!("WTF"),
-						},
-						_ => panic!("There's an input node in the hidden layers!"),
-					}
-				}
-			}
-		}
-		let index = hacks.inner_layers.len();
-		for mut node in &mut (hacks.output_layer) {
-			if rand::thread_rng().gen::<f64>() < mutation_chance {
-				let value = rand::thread_rng().gen_range(0,3);
-				match node {
-					&mut Node::GeneNode(ref mut gene) => 
-					match value {
-						0 => gene.input_node_one = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
-						1 => gene.input_node_two = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
-						2 => gene.function = rand::thread_rng().gen_range(0, f),
-						_ => panic!("WTF"),
-					},
-					_ => panic!("There's an input node in the hidden layers!"),
-				};
-			}
-		}
-		hacks
+
+    fn new_mutate_nodes(&mut self, num_mutations: usize, input_layer: &Layer, layers_back: usize, num_functions: usize, random_generator: &mut ThreadRng) {
+        let output_probability: f64 = self.get_output_probability();
+        for _ in 0..num_mutations {
+            self.new_mutate_node(input_layer, layers_back, output_probability, num_functions, random_generator);
+            //let index_to_mutate = self.new_get_random_node(self.inn)
+            //self.dghjryj();
+        }
     }
-	
+
+    ///
+    /// Probability that an output node will be chosen at random
+    ///
+    fn get_output_probability(&self) -> f64 {
+        return self.output_layer.len() as f64 / (self.output_layer.len() as f64 + (self.inner_layers[0].len() as f64 * self.inner_layers.len() as f64));
+    }
+
+    fn dghjryj(self) {
+        self.output_layer = vec![];
+    }
+
+
+
+    /*
+    //Gets messy with now adding length of input layer, layers back
+    fn mutate_nodes(&self, expected_muts: usize, input: &Layer, layers_back: usize, f: usize) -> Genome {
+        let mut hacks = Genome {
+            inner_layers: self.inner_layers.clone(),
+            output_layer: self.output_layer.clone(),
+        };
+
+        let mut nodes: usize = self.output_layer.len();
+        for x in &(self.inner_layers) {
+            nodes = nodes + x.len();
+        }
+
+        let mutation_chance: f64 = (expected_muts as f64) / (nodes as f64);
+
+        for index in 0..hacks.inner_layers.len() {
+            let mut x = &mut (hacks.inner_layers[index]);
+            for mut node in x {
+                if rand::thread_rng().gen::<f64>() < mutation_chance {
+                    let value = rand::thread_rng().gen_range(0, 3);
+                    match node {
+                        &mut Node::GeneNode(ref mut gene) =>
+                            match value {
+                                0 => gene.input_node_one = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
+                                1 => gene.input_node_two = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
+                                2 => gene.function = rand::thread_rng().gen_range(0, f),
+                                _ => panic!("WTF"),
+                            },
+                        _ => panic!("There's an input node in the hidden layers!"),
+                    }
+                }
+            }
+        }
+        let index = hacks.inner_layers.len();
+        for mut node in &mut (hacks.output_layer) {
+            if rand::thread_rng().gen::<f64>() < mutation_chance {
+                let value = rand::thread_rng().gen_range(0, 3);
+                match node {
+                    &mut Node::GeneNode(ref mut gene) =>
+                        match value {
+                            0 => gene.input_node_one = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
+                            1 => gene.input_node_two = self.get_random_node(index, layers_back, input, &mut rand::thread_rng()),
+                            2 => gene.function = rand::thread_rng().gen_range(0, f),
+                            _ => panic!("WTF"),
+                        },
+                    _ => panic!("There's an input node in the hidden layers!"),
+                };
+            }
+        }
+        hacks
+    }*/
+
 
     fn apply_fn(&self, function_layer: &Vec<BiFunction>, gene: &GeneNode, input_layer: &Layer) -> f64 {
         //Evaluate new result recursively
-        let input_one = self.get_node(&gene.input_node_one, input_layer);
-        let result_one = self.evaluate(input_one, input_layer, function_layer);
-        let input_two = self.get_node(&gene.input_node_two, input_layer);
-        let result_two = self.evaluate(input_two, input_layer, function_layer);
+        //let input_one = self.get_node(&gene.input_node_one, input_layer);
+        let result_one = self.evaluate(&gene.input_node_one, input_layer, function_layer);
+        //let input_two = self.get_node(&gene.input_node_two, input_layer);
+        let result_two = self.evaluate(&gene.input_node_two, input_layer, function_layer);
         return (function_layer[gene.function])(result_one, result_two);
     }
 
     //TODO: Correct usage of lifetimes?
     fn get_node<'a>(&'a self, i: &NodeIndex, input_layer: &'a Layer) -> &'a Node {
         match i {
-            & NodeIndex::InputIndex(j) => & input_layer[j],
-            & NodeIndex::GeneIndex(j, k) => & self.inner_layers[j][k],
+            &NodeIndex::InputIndex(j) => &input_layer[j],
+            &NodeIndex::GeneIndex(j, k) => &self.inner_layers[j][k],
         }
     }
 
-    fn evaluate(&self, the_node: &Node, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
+    fn evaluate(&self, the_node_i: &NodeIndex, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
+        let the_node: Node = self.get_node(NodeIndex, input_layer);
         match the_node {
             //Input is effectively constant
             &Node::InputNode(input) => input,
@@ -220,7 +282,7 @@ impl Graph {
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
     }
-	/*
+    /*
 	Won't work yet due to mutable stuff, and there is no genome.error!
 	fn update(&mut self,expected_muts: usize, layers_back: usize) {
 		let mut max = 0.0;
@@ -241,13 +303,14 @@ impl Graph {
 	*/
 }
 
+/*
 struct GraphBuilder {
-	genome_count: i32,
-	inputs: Layer,
-	functions: Vec<BiFunction>,
-	hidden_layers: Vec<Layer>,
-	output: Layer,
-	levels: usize,
+    genome_count: i32,
+    inputs: Layer,
+    functions: Vec<BiFunction>,
+    hidden_layers: Vec<Layer>,
+    output: Layer,
+    levels: usize,
 }
 
 /*
@@ -264,156 +327,158 @@ struct GraphBuilder {
 	TODO: Force restraints on configuration (ex. one output layer)
 */
 impl GraphBuilder {
-	fn new(genomes: i32) -> GraphBuilder {
-		GraphBuilder {
-			inputs: Layer::new(),
-			functions: Vec::new(),
-			hidden_layers: Vec::new(),
-			output: Layer::new(),
-			genome_count: genomes,
-			levels: 1,
-		}
-	}
-	fn addInput(&mut self,input: Vec<f64>) -> &mut GraphBuilder {
-		for x in input {
-			self.inputs.push(Node::InputNode(x));
-		}
-		self
-	}
-	fn addHidden(&mut self,size: i32) -> &mut GraphBuilder {
-		self.hidden_layers.push(Layer::new());
-		let length: usize = self.hidden_layers.len()-1;
-		for index in 0..size {
-			self.hidden_layers[length].push(Node::GeneNode(GeneNode {
-				function: 0, //BiFunction
-				input_node_one: NodeIndex::InputIndex(0), //Node
-				input_node_two: NodeIndex::InputIndex(0), //Node
-			}
-			));
-		}
-		self
-	}
-	fn addOutput(&mut self,size: i32) -> &mut GraphBuilder {
-		self.output = Layer::new();
-		for index in 0..size {
-			self.output.push(Node::GeneNode(GeneNode {
-				function: 0, //BiFunction
-				input_node_one: NodeIndex::InputIndex(0), //Node
-				input_node_two: NodeIndex::InputIndex(0), //Node
-			}
-			));
-		}
-		self
-	}
-	fn addFunctions(&mut self, funcs: Vec<BiFunction>) -> &mut GraphBuilder{
-		self.functions = funcs;
-		self
-	}
-	fn levels(&mut self, levels: usize) -> &mut GraphBuilder {
-		self.levels = levels;
-		self
-	}
-	fn build(&mut self) -> Graph {
-		let mut g = Vec::new();
-		for index in 0..self.genome_count {
-			let mut gene = Genome {
+    fn new(genomes: i32) -> GraphBuilder {
+        GraphBuilder {
+            inputs: Layer::new(),
+            functions: Vec::new(),
+            hidden_layers: Vec::new(),
+            output: Layer::new(),
+            genome_count: genomes,
+            levels: 1,
+        }
+    }
+    fn addInput(&mut self, input: Vec<f64>) -> &mut GraphBuilder {
+        for x in input {
+            self.inputs.push(Node::InputNode(x));
+        }
+        self
+    }
+    fn addHidden(&mut self, size: i32) -> &mut GraphBuilder {
+        self.hidden_layers.push(Layer::new());
+        let length: usize = self.hidden_layers.len() - 1;
+        for index in 0..size {
+            self.hidden_layers[length].push(Node::GeneNode(GeneNode {
+                function: 0,
+                //BiFunction
+                input_node_one: NodeIndex::InputIndex(0),
+                //Node
+                input_node_two: NodeIndex::InputIndex(0),
+                //Node
+            }
+            ));
+        }
+        self
+    }
+    fn addOutput(&mut self, size: i32) -> &mut GraphBuilder {
+        self.output = Layer::new();
+        for index in 0..size {
+            self.output.push(Node::GeneNode(GeneNode {
+                function: 0,
+                //BiFunction
+                input_node_one: NodeIndex::InputIndex(0),
+                //Node
+                input_node_two: NodeIndex::InputIndex(0),
+                //Node
+            }
+            ));
+        }
+        self
+    }
+    fn addFunctions(&mut self, funcs: Vec<BiFunction>) -> &mut GraphBuilder {
+        self.functions = funcs;
+        self
+    }
+    fn levels(&mut self, levels: usize) -> &mut GraphBuilder {
+        self.levels = levels;
+        self
+    }
+    fn build(&mut self) -> Graph {
+        let mut g = Vec::new();
+        for index in 0..self.genome_count {
+            let mut gene = Genome {
+                inner_layers: Vec::new(),
+                output_layer: Layer::new(),
 
-				inner_layers: Vec::new(),
-				output_layer: Layer::new(),
-			
-			};
-			gene.inner_layers = self.hidden_layers.clone();
-			gene.output_layer = self.output.clone();
-			g.push(gene);
-		}
-		let mut graph = Graph {
-			inputs: self.inputs.clone(),
-			functions: self.functions.clone(),
-			genomes: g,
-		};
-		
-		let function_len = graph.functions.len();
-		let input_len = graph.inputs.len();
-		let layers_back = self.levels;
-		
-		let mut layer_lens = Vec::new();
-		let graph = graph;
-		for layer in &(graph.genomes[0].inner_layers) {
-			layer_lens.push(layer.len());
-		}
-		let layer_lens = layer_lens;
-		let mut graph = graph;
-		
-		// TODO: randomize
-		for mut genome in &mut graph.genomes {
+            };
+            gene.inner_layers = self.hidden_layers.clone();
+            gene.output_layer = self.output.clone();
+            g.push(gene);
+        }
+        let mut graph = Graph {
+            inputs: self.inputs.clone(),
+            functions: self.functions.clone(),
+            genomes: g,
+        };
 
-			for mut gene in &mut genome.inner_layers[0] {
-				*gene = Node::GeneNode( GeneNode {
-					input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)), 
-					input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
-					function: rand::thread_rng().gen_range(0, function_len),
-				});
-			}
-			
-			for index in 1..(genome.inner_layers.len()) {
-			
-				for mut gene in &mut genome.inner_layers[index] {
-				
-					// TODO: Allow genes to connect to both an input and gene node
-					let back = if layers_back != 1 {
-						rand::thread_rng().gen_range(1, layers_back)
-					}else {
-						1
-					};
-					let to_layer: isize = cmp::max(-1, (index as isize) - (back as isize));
-					if to_layer < 0 {
-						let to_layer = to_layer as usize;
-						*gene = Node::GeneNode( GeneNode {
-						input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)), 
-						input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
-						function: rand::thread_rng().gen_range(0, function_len),
-						});
-					}else {
-						let to_layer = to_layer as usize;
-						*gene = Node::GeneNode( GeneNode {
-						input_node_one: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 
-						input_node_two: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 		
-						function: rand::thread_rng().gen_range(0, function_len),
-						});
-					}
-				}
-			}
-			for mut gene in &mut genome.output_layer {
-			
-				// TODO: Allow genes to connect to both an input and gene node
-				let index = layer_lens.len();
-				let back = if layers_back != 1 {
-						rand::thread_rng().gen_range(1, layers_back)
-					}else {
-						1
-					};
-				let to_layer: isize = cmp::max(-1, (index as isize) - (back as isize));
-				if to_layer < 0 {
-					let to_layer = to_layer as usize;
-					*gene = Node::GeneNode( GeneNode {
-					input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)), 
-					input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
-					function: rand::thread_rng().gen_range(0, function_len),
-					});
-				}else {
-					let to_layer = to_layer as usize;
-					*gene = Node::GeneNode( GeneNode {
-					input_node_one: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 
-					input_node_two: NodeIndex::GeneIndex(to_layer,rand::thread_rng().gen_range(0, layer_lens[index-1])), 		
-					function: rand::thread_rng().gen_range(0, function_len),
-					});
-				}
-			}
-		}
-		let graph = graph;
-		graph
-	}
+        let function_len = graph.functions.len();
+        let input_len = graph.inputs.len();
+        let layers_back = self.levels;
+
+        let mut layer_lens = Vec::new();
+        let graph = graph;
+        for layer in &(graph.genomes[0].inner_layers) {
+            layer_lens.push(layer.len());
+        }
+        let layer_lens = layer_lens;
+        let mut graph = graph;
+
+        // TODO: randomize
+        for mut genome in &mut graph.genomes {
+            for mut gene in &mut genome.inner_layers[0] {
+                *gene = Node::GeneNode(GeneNode {
+                    input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+                    input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+                    function: rand::thread_rng().gen_range(0, function_len),
+                });
+            }
+
+            for index in 1..(genome.inner_layers.len()) {
+                for mut gene in &mut genome.inner_layers[index] {
+                    // TODO: Allow genes to connect to both an input and gene node
+                    let back = if layers_back != 1 {
+                        rand::thread_rng().gen_range(1, layers_back)
+                    } else {
+                        1
+                    };
+                    let to_layer: isize = cmp::max(-1, (index as isize) - (back as isize));
+                    if to_layer < 0 {
+                        let to_layer = to_layer as usize;
+                        *gene = Node::GeneNode(GeneNode {
+                            input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+                            input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+                            function: rand::thread_rng().gen_range(0, function_len),
+                        });
+                    } else {
+                        let to_layer = to_layer as usize;
+                        *gene = Node::GeneNode(GeneNode {
+                            input_node_one: NodeIndex::GeneIndex(to_layer, rand::thread_rng().gen_range(0, layer_lens[index - 1])),
+                            input_node_two: NodeIndex::GeneIndex(to_layer, rand::thread_rng().gen_range(0, layer_lens[index - 1])),
+                            function: rand::thread_rng().gen_range(0, function_len),
+                        });
+                    }
+                }
+            }
+            for mut gene in &mut genome.output_layer {
+                // TODO: Allow genes to connect to both an input and gene node
+                let index = layer_lens.len();
+                let back = if layers_back != 1 {
+                    rand::thread_rng().gen_range(1, layers_back)
+                } else {
+                    1
+                };
+                let to_layer: isize = cmp::max(-1, (index as isize) - (back as isize));
+                if to_layer < 0 {
+                    let to_layer = to_layer as usize;
+                    *gene = Node::GeneNode(GeneNode {
+                        input_node_one: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+                        input_node_two: NodeIndex::InputIndex(rand::thread_rng().gen_range(0, input_len)),
+                        function: rand::thread_rng().gen_range(0, function_len),
+                    });
+                } else {
+                    let to_layer = to_layer as usize;
+                    *gene = Node::GeneNode(GeneNode {
+                        input_node_one: NodeIndex::GeneIndex(to_layer, rand::thread_rng().gen_range(0, layer_lens[index - 1])),
+                        input_node_two: NodeIndex::GeneIndex(to_layer, rand::thread_rng().gen_range(0, layer_lens[index - 1])),
+                        function: rand::thread_rng().gen_range(0, function_len),
+                    });
+                }
+            }
+        }
+        let graph = graph;
+        graph
+    }
 }
+*/
 
 #[test]
 fn test_graph() {
@@ -422,9 +487,9 @@ fn test_graph() {
     let input2 = Node::InputNode(1.0);
     let input2_i = NodeIndex::InputIndex(1);
 
-    fn op1 (x: f64, y: f64) -> f64 { x + y };
+    fn op1(x: f64, y: f64) -> f64 { x + y };
     let op1_i = 0;
-    fn op2 (x: f64, y: f64) -> f64 { x - y };
+    fn op2(x: f64, y: f64) -> f64 { x - y };
     let op2_i = 1;
 
     let gene1 = Node::GeneNode(GeneNode {
@@ -432,16 +497,18 @@ fn test_graph() {
         input_node_one: input2_i,
         input_node_two: input2_i,
     });
+    let gene1_i = NodeIndex::GeneIndex(0, 0);
 
     let gene2 = Node::GeneNode(GeneNode {
         function: op2_i,
         input_node_one: input1_i,
         input_node_two: input2_i,
     });
+    let gene2_i = NodeIndex::GeneIndex(0, 1);
 
     let genome = Genome {
         inner_layers: vec![vec![gene1, gene2]],
-        output_layer: vec![input1, gene1, gene2],
+        output_layer: vec![input1_i, gene1_i, gene2_i],
     };
 
     let the_graph = Graph {
@@ -456,24 +523,24 @@ fn test_graph() {
     assert_eq!(result1, 0.0);
     assert_eq!(result2, 2.0);
     assert_eq!(result3, -1.0);
-	
-	
-	let inp = vec![0.1,0.2,0.3,0.4];
-	let fns = [op1,op2].to_vec();
-	let new_graph = GraphBuilder::new(1)
-	.addInput(inp)
-	.addHidden(8)
-	.addHidden(4)
-	.addHidden(2)
-	.addOutput(1)
-	.addFunctions(fns)
-	.levels(1)
-	.build();
-	
-	let mut g = new_graph.genomes[0].mutate_nodes(10, &(new_graph.inputs), 1, new_graph.functions.len());
-	
-	let result1 = new_graph.genomes[0].evaluate(&new_graph.genomes[0].output_layer[0], &new_graph.inputs, &new_graph.functions);
-	
+
+
+    /*
+    let inp = vec![0.1, 0.2, 0.3, 0.4];
+    let fns = [op1, op2].to_vec();
+    let new_graph = GraphBuilder::new(1)
+        .addInput(inp)
+        .addHidden(8)
+        .addHidden(4)
+        .addHidden(2)
+        .addOutput(1)
+        .addFunctions(fns)
+        .levels(1)
+        .build();
+
+    let mut g = new_graph.genomes[0].mutate_nodes(10, &(new_graph.inputs), 1, new_graph.functions.len());
+
+    let result1 = new_graph.genomes[0].evaluate(&new_graph.genomes[0].output_layer[0], &new_graph.inputs, &new_graph.functions);*/
 }
 
 
