@@ -388,6 +388,27 @@ impl Graph {
         }
         println!()
     }
+	
+	/*
+	fn run(&self, expected_outputs: &Vec<f64>, muts: usize, layers_back: usize,rng: &mut ThreadRng) {
+		let mut max: f64 = 0.0;
+		let mut g_ref: &Genome = &self.genomes[0];
+		for genome in self.genomes {
+			let x = genome.test(expected_outputs);
+			if x > max:
+				max = x;
+				g_ref = &genome;
+		}
+		for mut genome in mut self.genomes {
+			genome = *g_ref.clone();
+		}
+		for i in 0..self.genomes.len() {
+			let g = &mut self.genomes[i];
+			g = g.new_mutate_nodes(muts, self.inputs, layers_back, self.functions.len(), rng);
+		}
+	}
+	
+	*/
 
     /*
 	Won't work yet due to mutable stuff, and there is no genome.error!
