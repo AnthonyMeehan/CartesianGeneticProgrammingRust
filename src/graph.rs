@@ -6,14 +6,14 @@ use std::cmp;
 type BiFunction = fn(f64,f64) -> f64;
 type FunctionIndex = usize;
 
-#[derive(Clone, Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 enum NodeIndex {
     InputIndex(usize),
     GeneIndex(usize, usize),
 }
 
 ///Gene Nodes Contain a function index, two input indices, and a possible previously-evaluated result
-#[derive(Clone, Copy,Debug)]
+#[derive(Clone, Copy, Debug)]
 struct GeneNode {
     function: FunctionIndex, //BiFunction
     input_node_one: NodeIndex, //Node
@@ -68,13 +68,12 @@ impl Node {
         }
     }
 
-    /*
     pub fn get_gene(self) -> GeneNode {
         match self {
             Node::GeneNode(x) => x,
             Node::InputNode(_) => panic!("called `Node::get_gene()` on a `InputNode` value"),
         }
-    }*/
+    }
 
 
 }
@@ -92,6 +91,9 @@ impl Genome {
     /// Since nodes aren't chosen from N, N can be equal to number of function_layers,
     /// i.e. for output layer.
     fn get_random_node(&self, from_layer: usize, layers_back: usize, input_layer: &Layer, random_generator: &mut ThreadRng) -> NodeIndex {
+        return Genome::get_random_node_from_slice(self.inner_layers.as_slice(), from_layer, layers_back, input_layer, random_generator);
+
+        /*
         assert!(layers_back > 0, "layers_back must be greater than 0");
         assert!(from_layer >= 0, "from_layer must be greater than or equal to 0");
         assert!(from_layer <= self.inner_layers.len(), "from_layer must be less than or equal to number of function_layers");
@@ -110,6 +112,37 @@ impl Genome {
             let node_index = random_generator.gen_range(0, self.inner_layers[layer_index as usize].len());
             return NodeIndex::GeneIndex(layer_index as usize, node_index);
         }
+        */
+    }
+
+    /// From a slice of inner layers, presumably from some larger genome, pick a random node from
+    /// some layer N to N-layers_back (not including N).
+    ///
+    /// This can be useful when mutating a node, since Rust only permits either 1 mutable reference,
+    /// or many immutable references. So one might perform a split_at_mut to get two separately
+    /// managed slices from the original layers.
+    ///
+    /// Since nodes aren't chosen from N, N can be equal to number of function_layers,
+    /// i.e. when dealing with the output_layer.
+    fn get_random_node_from_slice(inner_layers: &[Layer], from_layer: usize, layers_back: usize, input_layer: &Layer, random_generator: &mut ThreadRng) -> NodeIndex {
+        assert!(layers_back > 0, "layers_back must be greater than 0");
+        assert!(from_layer >= 0, "from_layer must be greater than or equal to 0");
+        assert!(from_layer <= inner_layers.len(), "from_layer must be less than or equal to number of function_layers");
+
+        //If layers_back > from_layer, counteract bias towards input nodes
+        let to_layer: isize = cmp::max(-1, (from_layer as isize) - (layers_back as isize));
+
+        let layer_index: isize = random_generator.gen_range(to_layer, from_layer as isize);
+
+        if layer_index < 0 {
+            //choose a node index from the input layer
+            let node_index = random_generator.gen_range(0, input_layer.len());
+            return NodeIndex::InputIndex(node_index);
+        } else {
+            //choose a node index from some internal layer
+            let node_index = random_generator.gen_range(0, inner_layers[layer_index as usize].len());
+            return NodeIndex::GeneIndex(layer_index as usize, node_index);
+        }
     }
 
     fn new_mutate_node(&mut self, input_layer: &Layer, layers_back: usize, output_probability: f64, num_functions: usize, random_generator: &mut ThreadRng) {
@@ -117,26 +150,35 @@ impl Genome {
 
         //if layer_index == self.inner_layers.len() { //TODO: check on output prob instead
         if random_generator.gen_range(0.0, 1.0) < output_probability {
+            //println!("Outer!");
             //mutate an output connection
             let output_index: usize = random_generator.gen_range(0, self.output_layer.len());
             self.output_layer[output_index] = self.get_random_node(self.inner_layers.len(), layers_back, input_layer, random_generator);
         }
         else {
+            //println!("Internal!");
             //mutate an internal node
             let layer_index: usize = random_generator.gen_range(0, self.inner_layers.len());
-            let node_index: usize = random_generator.gen_range(0, self.inner_layers[layer_index].len());
-            let node_to_mutate: Node = self.inner_layers[layer_index][node_index];
+
+            //need to slice layers in two in order to deal with 1 immutable and 1 mutable reference
+            let (below_layer, at_or_above_layer) = self.inner_layers.split_at_mut(layer_index);
+
+            //let node_index: usize = random_generator.gen_range(0, at_or_above_layer[0].len());
+
+            let mut node_to_mutate: &mut Node = random_generator.choose_mut(at_or_above_layer[0].as_mut_slice()).expect("Chose a nonexistent out-of-bounds inner layer.");
             match node_to_mutate {
-                Node::GeneNode(gene) => {
+                &mut Node::GeneNode(ref mut gene) => {
                     //pick between function and two inputs
                     match random_generator.gen_range(0, 3) {
                         //function: pick index from a list of functions //TODO: Use the list directly?
                         0 => gene.function = random_generator.gen_range(0, num_functions),
-                        1 => gene.input_node_one = self.get_random_node(layer_index, layers_back, input_layer, random_generator),
-                        2 => gene.input_node_two = self.get_random_node(layer_index, layers_back, input_layer, random_generator),
+                        1 => gene.input_node_one = Genome::get_random_node_from_slice(below_layer, layer_index, layers_back, input_layer, random_generator),
+                        2 => gene.input_node_two = Genome::get_random_node_from_slice(below_layer, layer_index, layers_back, input_layer, random_generator),
+                        _ => panic!("Generated outside range"),
                     }
+
                 }
-                Node::InputNode(_) => panic!("Expected GeneNode in internal layer, got Input instead")
+                &mut Node::InputNode(_) => panic!("Expected GeneNode in internal layer, got Input instead")
             }
         }
 
@@ -154,6 +196,7 @@ impl Genome {
 
     fn new_mutate_nodes(&mut self, num_mutations: usize, input_layer: &Layer, layers_back: usize, num_functions: usize, random_generator: &mut ThreadRng) {
         let output_probability: f64 = self.get_output_probability();
+        //println!("Outprob: {}", output_probability);
         for _ in 0..num_mutations {
             self.new_mutate_node(input_layer, layers_back, output_probability, num_functions, random_generator);
             //let index_to_mutate = self.new_get_random_node(self.inn)
@@ -168,7 +211,7 @@ impl Genome {
         return self.output_layer.len() as f64 / (self.output_layer.len() as f64 + (self.inner_layers[0].len() as f64 * self.inner_layers.len() as f64));
     }
 
-    fn dghjryj(self) {
+    fn dghjryj(&mut self) {
         self.output_layer = vec![];
     }
 
@@ -245,7 +288,7 @@ impl Genome {
     }
 
     fn evaluate(&self, the_node_i: &NodeIndex, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
-        let the_node: Node = self.get_node(NodeIndex, input_layer);
+        let the_node: &Node = self.get_node(the_node_i, input_layer);
         match the_node {
             //Input is effectively constant
             &Node::InputNode(input) => input,
@@ -267,9 +310,8 @@ impl Genome {
     }
 }
 
-// The Graph struct containing the list of genes
-// and the input into the Graph, and a list of
-// functions to be used as nodes
+/// The Graph struct containing the list of genes, and the inputs to the Graph,
+/// as well as a list of functions to be used as nodes
 #[derive(Debug)]
 struct Graph {
     inputs: Layer,
@@ -282,6 +324,33 @@ impl Graph {
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
     }
+
+    /// Prints the inputs, genomes and outputs for the graph to stdout
+    fn print_graph(&self, graph_name: &str) {
+        println!("\nGraph: {}", graph_name);
+        print!("Inputs: ");
+        for (i, input) in self.inputs.iter().enumerate() {
+            print!("{}: {}, ", i, input.get_input())
+        }
+        print!("\nGenomes:");
+        for (i, genome) in self.genomes.iter().enumerate() {
+            println!("\n\tGenome {}: ", i);
+            for (j, layer) in genome.inner_layers.iter().enumerate() {
+                println!("\t\tInner Layer {}: ", j);
+                for (k, node) in layer.iter().enumerate() {
+                    let gene = node.get_gene();
+                    println!("\t\t\tNode{}: (fn:{}, i1:{:?}, i2:{:?}, ",
+                             k, gene.function, gene.input_node_one, gene.input_node_two);
+                }
+            }
+            print!("\t\tOutputs: ");
+            for (j, output) in genome.output_layer.iter().enumerate() {
+                print!("{}: {:?}, ", j, output)
+            }
+        }
+        println!()
+    }
+
     /*
 	Won't work yet due to mutable stuff, and there is no genome.error!
 	fn update(&mut self,expected_muts: usize, layers_back: usize) {
@@ -313,14 +382,15 @@ struct GraphBuilder {
     levels: usize,
 }
 
+
 /*
 	Graph builder
 		new(genomes) initializes builder with given genome count.
 		methods are:
-			addInput(input vector) adds input vector 
-			addFunctions(function vector) adds functions
-			addHidden(size) adds a hidden layer of given size
-			addOutput(size) adds an output layer of given size
+			add_input(input vector) adds input vector
+			add_functions(function vector) adds functions
+			add_hidden(size) adds a hidden layer of given size
+			add_output(size) adds an output layer of given size
 			levels(levels_back) sets levels back
 			build() builds graph from GraphBuilder
 			
@@ -337,13 +407,13 @@ impl GraphBuilder {
             levels: 1,
         }
     }
-    fn addInput(&mut self, input: Vec<f64>) -> &mut GraphBuilder {
+    fn add_input(&mut self, input: Vec<f64>) -> &mut GraphBuilder {
         for x in input {
             self.inputs.push(Node::InputNode(x));
         }
         self
     }
-    fn addHidden(&mut self, size: i32) -> &mut GraphBuilder {
+    fn add_hidden(&mut self, size: i32) -> &mut GraphBuilder {
         self.hidden_layers.push(Layer::new());
         let length: usize = self.hidden_layers.len() - 1;
         for index in 0..size {
@@ -359,7 +429,7 @@ impl GraphBuilder {
         }
         self
     }
-    fn addOutput(&mut self, size: i32) -> &mut GraphBuilder {
+    fn add_output(&mut self, size: i32) -> &mut GraphBuilder {
         self.output = Layer::new();
         for index in 0..size {
             self.output.push(Node::GeneNode(GeneNode {
@@ -374,7 +444,7 @@ impl GraphBuilder {
         }
         self
     }
-    fn addFunctions(&mut self, funcs: Vec<BiFunction>) -> &mut GraphBuilder {
+    fn add_functions(&mut self, funcs: Vec<BiFunction>) -> &mut GraphBuilder {
         self.functions = funcs;
         self
     }
@@ -525,16 +595,25 @@ fn test_graph() {
     assert_eq!(result3, -1.0);
 
 
+
+    the_graph.print_graph("Initial");
+
+    let mut new_graph = the_graph;
+    new_graph.genomes[0].new_mutate_nodes(12, &new_graph.inputs, 2, 4, &mut rand::thread_rng());
+
+    new_graph.print_graph("Mutated");
+
+
     /*
     let inp = vec![0.1, 0.2, 0.3, 0.4];
     let fns = [op1, op2].to_vec();
     let new_graph = GraphBuilder::new(1)
-        .addInput(inp)
-        .addHidden(8)
-        .addHidden(4)
-        .addHidden(2)
-        .addOutput(1)
-        .addFunctions(fns)
+        .add_input(inp)
+        .add_hidden(8)
+        .add_hidden(4)
+        .add_hidden(2)
+        .add_output(1)
+        .add_functions(fns)
         .levels(1)
         .build();
 

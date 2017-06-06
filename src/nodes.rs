@@ -18,9 +18,9 @@ fn multiply(x: f64, y: f64) -> f64 {
 
 fn protected_divide(x: f64, y: f64) -> f64 {
 
-	if y == 0
+	if y == 0.0
 	{
-		return 1000_000_000_000_000
+		return 1000_000_000_000_000.0
 	}
 	x / y
 
