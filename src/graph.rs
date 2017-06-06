@@ -291,9 +291,9 @@ impl Genome {
     fn apply_fn(&self, function_layer: &Vec<BiFunction>, gene: &GeneNode, input_layer: &Layer) -> f64 {
         //Evaluate new result recursively
         //let input_one = self.get_node(&gene.input_node_one, input_layer);
-        let result_one = self.evaluate(&gene.input_node_one, input_layer, function_layer);
+        let result_one = self.evaluate_node(&gene.input_node_one, input_layer, function_layer);
         //let input_two = self.get_node(&gene.input_node_two, input_layer);
-        let result_two = self.evaluate(&gene.input_node_two, input_layer, function_layer);
+        let result_two = self.evaluate_node(&gene.input_node_two, input_layer, function_layer);
         return (function_layer[gene.function])(result_one, result_two);
     }
 
@@ -305,12 +305,11 @@ impl Genome {
         }
     }
 
-    fn evaluate(&self, the_node_i: &NodeIndex, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
+    fn evaluate_node(&self, the_node_i: &NodeIndex, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
         let the_node: &Node = self.get_node(the_node_i, input_layer);
         match the_node {
             //Input is effectively constant
             &Node::InputNode(input) => input,
-            //TODO: Gene may or may not have been evaluated recently
             &Node::GeneNode(ref gene) => self.apply_fn(function_layer, gene, input_layer),
             /*{
                 match gene.output {
@@ -325,6 +324,32 @@ impl Genome {
                 }
             }*/
         }
+    }
+
+    /// Evaluates all output nodes separately, for fitness evaluation
+    fn get_outputs(&self, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> Vec<f64> {
+        let mut result: Vec<f64> = Vec::with_capacity(self.output_layer.len());
+        for output in self.output_layer.iter() {
+            result.push(self.evaluate_node(&output, input_layer, function_layer));
+        }
+        return result;
+    }
+
+    ///Returns the mean-squared error or mean-absolute error for this gene, given an expected output
+    fn get_error(&self, expected_output: Vec<f64>, use_mean_squared: bool, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
+        assert!(expected_output.len() == self.output_layer.len(), "Gene output must have same size as expected output");
+        let outputs: Vec<f64> = self.get_outputs(input_layer, function_layer);
+        let mut error: f64 = 0;
+        for i in 0..outputs.len() {
+            let difference: f64 = outputs[i] - expected_output[i];
+            if use_mean_squared {
+                error += difference * difference;
+            }
+            else {
+                error += difference.abs();
+            }
+        }
+        return error;
     }
 }
 
@@ -358,6 +383,8 @@ impl Graph {
             genomes: the_genomes,
         };
     }
+
+
 
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
@@ -628,9 +655,9 @@ fn test_graph() {
         genomes: vec![genome],
     };
 
-    let result1 = the_graph.genomes[0].evaluate(&the_graph.genomes[0].output_layer[0], &the_graph.inputs, &the_graph.functions);
-    let result2 = the_graph.genomes[0].evaluate(&the_graph.genomes[0].output_layer[1], &the_graph.inputs, &the_graph.functions);
-    let result3 = the_graph.genomes[0].evaluate(&the_graph.genomes[0].output_layer[2], &the_graph.inputs, &the_graph.functions);
+    let result1 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[0], &the_graph.inputs, &the_graph.functions);
+    let result2 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[1], &the_graph.inputs, &the_graph.functions);
+    let result3 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[2], &the_graph.inputs, &the_graph.functions);
     assert_eq!(result1, 0.0);
     assert_eq!(result2, 2.0);
     assert_eq!(result3, -1.0);
@@ -647,6 +674,11 @@ fn test_graph() {
     let gen_graph = Graph::new(2, 2, 2, 2, 3, 2, vec![op1, op2], &mut rand::thread_rng());
 
     gen_graph.print_graph("Generated");
+
+    for genome in gen_graph.genomes {
+        println!("{:?}", genome.get_outputs(&vec![input1, input2], &vec![op1, op2]));
+    }
+
 
 
     /*
