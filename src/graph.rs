@@ -79,7 +79,7 @@ impl Node {
 }
 
 type Layer = Vec<Node>;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Genome {
     inner_layers: Vec<Layer>,
     output_layer: Vec<NodeIndex>, //TODO: was just 'Layer' before
@@ -339,7 +339,7 @@ impl Genome {
     fn get_error(&self, expected_output: Vec<f64>, use_mean_squared: bool, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
         assert!(expected_output.len() == self.output_layer.len(), "Gene output must have same size as expected output");
         let outputs: Vec<f64> = self.get_outputs(input_layer, function_layer);
-        let mut error: f64 = 0;
+        let mut error: f64 = 0.0;
         for i in 0..outputs.len() {
             let difference: f64 = outputs[i] - expected_output[i];
             if use_mean_squared {
@@ -355,7 +355,7 @@ impl Genome {
 
 /// The Graph struct containing the list of genes, and the inputs to the Graph,
 /// as well as a list of functions to be used as nodes
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Graph {
     inputs: Layer,
     //TODO: constants: Vec<f64>,
@@ -696,10 +696,12 @@ fn test_graph() {
 
     gen_graph.print_graph("Generated");
 
-    for genome in gen_graph.genomes {
+    for genome in gen_graph.genomes.iter() {
         println!("{:?}", genome.get_outputs(&vec![input1, input2], &vec![op1, op2]));
     }
 
+    let gen_graph2 = gen_graph.clone();
+    gen_graph2.print_graph("Cloned");
 
 
     /*
