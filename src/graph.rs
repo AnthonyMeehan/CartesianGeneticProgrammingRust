@@ -87,6 +87,38 @@ struct Genome {
 
 
 impl Genome {
+    /// Makes a randomized new genome
+    pub fn new(input_layer: &Layer, num_columns: usize, num_rows: usize, num_outputs: usize, layers_back: usize, num_functions: usize, random_generator: &mut ThreadRng) -> Genome {
+        let mut the_inner_layers: Vec<Layer> = Vec::with_capacity(num_columns);
+
+        //Add inner layers from left to right
+        for i in 0..num_columns {
+            let mut inner_layer: Layer = Vec::with_capacity(num_rows);
+            //Add random valid nodes
+            for j in 0..num_rows {
+                inner_layer.push(Node::GeneNode(GeneNode {
+                    function: random_generator.gen_range(0, num_functions),
+                    input_node_one: (Genome::get_random_node_from_layers(&the_inner_layers, i, layers_back, input_layer, random_generator)),
+                    input_node_two: (Genome::get_random_node_from_layers(&the_inner_layers, i, layers_back, input_layer, random_generator)),
+                }));
+            }
+            the_inner_layers.push(inner_layer);
+        }
+
+        //Add valid outputs
+        let mut the_output_layer: Vec<NodeIndex> = Vec::new();
+        for i in 0..num_outputs {
+            the_output_layer.push(Genome::get_random_node_from_layers(&the_inner_layers, the_inner_layers.len(), layers_back, input_layer, random_generator));
+        }
+
+        return Genome {
+            inner_layers: the_inner_layers,
+            output_layer: the_output_layer,
+        }
+    }
+
+
+
     /// Pick a random node from some layer N to N-layers_back (not including N).
     /// Since nodes aren't chosen from N, N can be equal to number of function_layers,
     /// i.e. for output layer.
@@ -113,6 +145,10 @@ impl Genome {
             return NodeIndex::GeneIndex(layer_index as usize, node_index);
         }
         */
+    }
+
+    fn get_random_node_from_layers(inner_layers: &Vec<Layer>, from_layer: usize, layers_back: usize, input_layer: &Layer, random_generator: &mut ThreadRng) -> NodeIndex {
+        return Genome::get_random_node_from_slice(inner_layers.as_slice(), from_layer, layers_back, input_layer, random_generator);
     }
 
     /// From a slice of inner layers, presumably from some larger genome, pick a random node from
@@ -181,17 +217,6 @@ impl Genome {
                 &mut Node::InputNode(_) => panic!("Expected GeneNode in internal layer, got Input instead")
             }
         }
-
-            /*
-        if layer_index < 0 {
-            //choose a node index from the input layer
-            let node_index = random_generator.gen_range(0, input_layer.unwrap().len());
-            return NodeIndex::InputIndex(node_index);
-        } else {
-            //choose a node index from some internal layer
-            let node_index = random_generator.gen_range(0, self.inner_layers[layer_index as usize].len());
-            return NodeIndex::GeneIndex(layer_index as usize, node_index);
-        }*/
     }
 
     fn new_mutate_nodes(&mut self, num_mutations: usize, input_layer: &Layer, layers_back: usize, num_functions: usize, random_generator: &mut ThreadRng) {
@@ -199,8 +224,6 @@ impl Genome {
         //println!("Outprob: {}", output_probability);
         for _ in 0..num_mutations {
             self.new_mutate_node(input_layer, layers_back, output_probability, num_functions, random_generator);
-            //let index_to_mutate = self.new_get_random_node(self.inn)
-            //self.dghjryj();
         }
     }
 
@@ -210,11 +233,6 @@ impl Genome {
     fn get_output_probability(&self) -> f64 {
         return self.output_layer.len() as f64 / (self.output_layer.len() as f64 + (self.inner_layers[0].len() as f64 * self.inner_layers.len() as f64));
     }
-
-    fn dghjryj(&mut self) {
-        self.output_layer = vec![];
-    }
-
 
 
     /*
@@ -321,6 +339,26 @@ struct Graph {
 }
 
 impl Graph {
+    pub fn new(num_genomes: usize, num_inputs: usize, num_columns: usize, num_rows: usize, num_outputs: usize, layers_back: usize, the_functions: Vec<BiFunction>, random_generator: &mut ThreadRng) -> Graph {
+        let mut the_genomes: Vec<Genome> = Vec::with_capacity(num_genomes);
+
+        //Initialise inputs to empty values
+        let mut initial_inputs: Layer = Vec::with_capacity(num_inputs);
+        for i in 0..num_inputs {
+            initial_inputs.push(Node::InputNode(0.0));
+        }
+
+        for i in 0..num_genomes {
+            the_genomes.push(Genome::new(&initial_inputs, num_columns, num_rows, num_outputs, layers_back, the_functions.len(), random_generator));
+        }
+
+        return Graph {
+            inputs: initial_inputs,
+            functions: the_functions,
+            genomes: the_genomes,
+        };
+    }
+
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
         return random_generator.gen_range(0, self.functions.len());
     }
@@ -372,7 +410,7 @@ impl Graph {
 	*/
 }
 
-/*
+
 struct GraphBuilder {
     genome_count: i32,
     inputs: Layer,
@@ -382,7 +420,7 @@ struct GraphBuilder {
     levels: usize,
 }
 
-
+/*
 /*
 	Graph builder
 		new(genomes) initializes builder with given genome count.
@@ -407,13 +445,14 @@ impl GraphBuilder {
             levels: 1,
         }
     }
-    fn add_input(&mut self, input: Vec<f64>) -> &mut GraphBuilder {
+
+    fn add_input(&mut self, input: Vec<f64>) {
         for x in input {
             self.inputs.push(Node::InputNode(x));
         }
-        self
     }
-    fn add_hidden(&mut self, size: i32) -> &mut GraphBuilder {
+
+    fn add_hidden(&mut self, size: i32) {
         self.hidden_layers.push(Layer::new());
         let length: usize = self.hidden_layers.len() - 1;
         for index in 0..size {
@@ -427,9 +466,9 @@ impl GraphBuilder {
             }
             ));
         }
-        self
     }
-    fn add_output(&mut self, size: i32) -> &mut GraphBuilder {
+
+    fn add_output(&mut self, size: i32) {
         self.output = Layer::new();
         for index in 0..size {
             self.output.push(Node::GeneNode(GeneNode {
@@ -442,8 +481,8 @@ impl GraphBuilder {
             }
             ));
         }
-        self
     }
+
     fn add_functions(&mut self, funcs: Vec<BiFunction>) -> &mut GraphBuilder {
         self.functions = funcs;
         self
@@ -550,6 +589,8 @@ impl GraphBuilder {
 }
 */
 
+
+
 #[test]
 fn test_graph() {
     let input1 = Node::InputNode(0.0);
@@ -602,6 +643,10 @@ fn test_graph() {
     new_graph.genomes[0].new_mutate_nodes(12, &new_graph.inputs, 2, 4, &mut rand::thread_rng());
 
     new_graph.print_graph("Mutated");
+
+    let gen_graph = Graph::new(2, 2, 2, 2, 3, 2, vec![op1, op2], &mut rand::thread_rng());
+
+    gen_graph.print_graph("Generated");
 
 
     /*
