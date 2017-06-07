@@ -336,7 +336,7 @@ impl Genome {
     }
 
     ///Returns the mean-squared error or mean-absolute error for this gene, given an expected output
-    fn get_error(&self, expected_output: Vec<f64>, use_mean_squared: bool, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
+    fn get_error(&self, expected_output: &Vec<f64>, use_mean_squared: bool, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
         assert!(expected_output.len() == self.output_layer.len(), "Gene output must have same size as expected output");
         let outputs: Vec<f64> = self.get_outputs(input_layer, function_layer);
         let mut error: f64 = 0.0;
@@ -703,6 +703,11 @@ fn test_graph() {
     let gen_graph2 = gen_graph.clone();
     gen_graph2.print_graph("Cloned");
 
+    println!("Error vs all-1s:");
+    for genome in gen_graph2.genomes.iter() {
+        println!("{:?}", genome.get_error(&vec![1.0, 1.0, 1.0], true, &vec![input1, input2], &vec![op1, op2]));
+    }
+
 
     /*
     let inp = vec![0.1, 0.2, 0.3, 0.4];
@@ -721,14 +726,3 @@ fn test_graph() {
 
     let result1 = new_graph.genomes[0].evaluate(&new_graph.genomes[0].output_layer[0], &new_graph.inputs, &new_graph.functions);*/
 }
-
-
-
-
-
-
-
-
-
-
-
