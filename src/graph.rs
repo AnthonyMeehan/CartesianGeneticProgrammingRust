@@ -4,6 +4,8 @@ use rand::ThreadRng;
 use std::cmp;
 use dataset;
 use operations;
+use std::io::stdout;
+use std::io::Write;
 
 pub type BiFunction = fn(f64,f64) -> f64;
 type FunctionIndex = usize;
@@ -472,8 +474,9 @@ impl Graph {
         return mutated_solution;
     }
 
-    /// Apply elitist top-1 selection or tournament selection to generate the next generation of
-    /// solutions. Returns the best solution from this new generation
+    /// Apply elitist top-1 selection(when tournament_size = 0), or tournament selection(for any
+    /// other tournament_size) to generate the next generation of solutions. Returns the best
+    /// solution from this new generation.
     fn next_generation(&mut self, the_dataset: &dataset::Dataset, tournament_size: usize, num_mutations: usize,  random_generator: &mut ThreadRng) -> (&Genome, f64) {
         if self.errors.is_none() {
             self.errors = Some(self.evaluate_population_errors(the_dataset, true));
@@ -487,9 +490,9 @@ impl Graph {
         if tournament_size == 0 {
             //Use elitist top-1 selection
             let (parent, parent_error): (&Genome, f64) = self.top_1_selection();
-            println!("Lowest_error: {}", parent.error_on_dataset(&the_dataset, true, &self.functions));
+            //println!("Lowest_error: {}", parent.error_on_dataset(&the_dataset, true, &self.functions));
             new_genomes.push(parent.clone());
-            new_errors.push(parent_error);  //TODO: Will it update?
+            new_errors.push(parent_error);
 
             for i in 1..self.genomes.len() {
                 let child: Genome = self.new_mutated_genome(parent, num_mutations, random_generator);
@@ -515,8 +518,60 @@ impl Graph {
 
         self.genomes = new_genomes;
         self.errors = Some(new_errors);
-        // Keep track of best solution so far
+        // Keep track of the best solution so far
         return self.top_1_selection();
+    }
+
+
+    fn run(&mut self, num_iterations: usize, display_progress: bool, the_dataset: &dataset::Dataset, tournament_size: usize, num_mutations: usize, random_generator: &mut ThreadRng) -> (Genome, f64) {
+        if self.errors.is_none() {
+            self.errors = Some(self.evaluate_population_errors(the_dataset, true));
+        }
+
+        let mut best_genome: Genome;
+        let mut lowest_error;
+        //Isolate borrow to this scope
+        {
+            let (mut first_genome, mut first_error): (&Genome, f64) = self.top_1_selection();
+            best_genome = first_genome.clone();
+            lowest_error = first_error;
+        }
+
+        //For a nice logarithmically-scaled progress indicator
+        let mut last_int_log_result: usize = 0;
+        let mut iterations_without_result: usize = 0;
+
+        if display_progress { print!("\n\nInitial, Lowest error: {}", lowest_error); }
+
+        for i in 0..num_iterations {
+            let (candidate_genome, candidate_error) = self.next_generation(the_dataset, tournament_size, num_mutations, random_generator);
+            if candidate_error < lowest_error {
+                if display_progress {
+                    print!("\nIteration {}/{}, Lowest error: {}", i, num_iterations, lowest_error);
+                    last_int_log_result = 0;
+                    iterations_without_result = 0;
+                }
+
+                best_genome = candidate_genome.clone();
+                lowest_error = candidate_error;
+            }
+            //Display progress proportional to the log of the lack of progress
+            else if display_progress {
+                iterations_without_result += 1;
+                let log_result = ((iterations_without_result as f64).log2()) as usize;
+                if log_result > last_int_log_result {
+                    last_int_log_result = log_result;
+                    print!(".");
+                    stdout().flush();
+                }
+            }
+        }
+
+        if display_progress {
+            println!("\nFinal, Lowest error: {}\n", lowest_error);
+            //self.print_graph("Final Graph");
+        }
+        return (best_genome, lowest_error);
     }
 
 	/*
@@ -746,10 +801,10 @@ impl GraphBuilder {
 fn test_graph_on_dataset() {
     let mut new_graph: Graph = Graph::new(
         HyperParameters {
-            num_genomes: 10,
+            num_genomes: 100,
             num_inputs: 1,
-            num_layers: 10,
-            nodes_per_layer: 20,
+            num_layers: 5,
+            nodes_per_layer: 40,
             num_outputs: 1,
             layers_back: 2,
         },
@@ -765,17 +820,7 @@ fn test_graph_on_dataset() {
         println!("Genome {} MSE: {}", i, genome.error_on_dataset(&the_dataset, true, &new_graph.functions));
     }
 
-    for i in 0..2000 {
-        println!("i: {}", i);
-        new_graph.next_generation(&the_dataset, 0, 10, &mut rand::thread_rng());
-
-        //new_graph.print_graph("Updated");
-
-        for (i, genome) in new_graph.genomes.iter().enumerate() {
-            println!("Genome {} MSE: {}", i, genome.error_on_dataset(&the_dataset, true, &new_graph.functions));
-        }
-    }
-
+    new_graph.run(2000, true, &the_dataset, 0, 100, &mut rand::thread_rng());
 }
 
 #[test]
