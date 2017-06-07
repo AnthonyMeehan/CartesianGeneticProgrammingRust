@@ -7,6 +7,8 @@ use operations;
 
 pub type BiFunction = fn(f64,f64) -> f64;
 type FunctionIndex = usize;
+type Layer = Vec<Node>;
+type PopulationErrors = Vec<f64>;
 
 #[derive(Clone, Copy, Debug)]
 enum NodeIndex {
@@ -31,27 +33,6 @@ enum Node {
 }
 
 impl Node {
-
-    // Constructor
-    /*
-    fn new(function: fn(f64,f64), input_one: i32, input_two: i32) -> BiFunction {
-        BiFunction {
-            function: function,
-            input_one: input_one,
-            input_two: input_two,
-        }
-    }*/
-
-    /*
-    fn random(functions: &Vec<BiFunction>, max_int: i32) -> Node {
-        Node {
-            function: *rand::thread_rng().choose(functions).unwrap(),
-            input_node_one: rand::thread_rng().gen_range(0, max_int), //task_rng
-            input_node_two: rand::thread_rng().gen_range(0, max_int),
-        }
-    }*/
-
-
     pub fn is_input(&self) -> bool {
         match *self {
             Node::InputNode(_) => true,
@@ -76,11 +57,8 @@ impl Node {
             Node::InputNode(_) => panic!("called `Node::get_gene()` on a `InputNode` value"),
         }
     }
-
-
 }
 
-type Layer = Vec<Node>;
 #[derive(Clone, Debug)]
 struct Genome {
     inner_layers: Vec<Layer>,
@@ -312,6 +290,7 @@ impl Genome {
             //Input is effectively constant
             &Node::InputNode(input) => input,
             &Node::GeneNode(ref gene) => self.apply_fn(function_layer, gene, input_layer),
+            //TODO: Save results to some "precomputed" table, would make multi-output faster. Dealing with recursive mutable structures is tricky.
             /*{
                 match gene.output {
                     //Return recent result
@@ -319,8 +298,7 @@ impl Genome {
                     //Evaluate new result recursively
                     None => {
                         return self.apply_fn(function_layer, gene, input_layer);
-                        //TODO: Save results to some "precomputed" table
-                        //TODO: Report: Tried precomputing inline, dealing with recursive mutable structures is hard...
+
                     }
                 }
             }*/
@@ -336,7 +314,7 @@ impl Genome {
         return result;
     }
 
-    ///Returns the mean-squared error or mean-absolute error for this gene, given an expected output
+    /// Returns the mean-squared error or mean-absolute error for this gene, given an expected output
     fn error_on_example(&self, expected_output: &Vec<f64>, use_mean_squared: bool, input_layer: &Layer, function_layer: &Vec<BiFunction>) -> f64 {
         assert!(expected_output.len() == self.output_layer.len(), "Gene output must have same size as expected output");
         let outputs: Vec<f64> = self.get_outputs(input_layer, function_layer);
@@ -353,7 +331,8 @@ impl Genome {
         return cumulative_error / outputs.len() as f64;
     }
 
-    ///Returns the average of the mean-squared error or mean-absolute error for this gene across a dataset of examples.
+    /// Returns the average of the mean-squared error or mean-absolute error for this genome,
+    /// across a dataset of examples
     fn error_on_dataset(&self, the_dataset: &dataset::Dataset, use_mean_squared: bool, function_layer: &Vec<BiFunction>) -> f64 {
         assert!(the_dataset.input_examples.len() == the_dataset.output_examples.len(), "Mismatch between length of input and output examples.");
         let mut cumulative_error: f64 = 0.0;
@@ -366,6 +345,7 @@ impl Genome {
     }
 }
 
+#[derive(Clone, Debug)]
 struct HyperParameters {
     num_genomes: usize,
     num_inputs: usize,
@@ -379,10 +359,13 @@ struct HyperParameters {
 /// as well as a list of functions to be used as nodes
 #[derive(Clone, Debug)]
 struct Graph {
-    inputs: Layer,
+    //dataset: dataset::Dataset,
+    //inputs: Layer,
     //TODO: constants: Vec<f64>,
+    hyperparameters: HyperParameters,
     functions: Vec<BiFunction>,
     genomes: Vec<Genome>,
+    errors: Option<PopulationErrors>,
 }
 
 impl Graph {
@@ -400,12 +383,13 @@ impl Graph {
         }
 
         return Graph {
-            inputs: initial_inputs,
+            //inputs: initial_inputs,
+            hyperparameters: genome_parameters,
             functions: the_functions,
             genomes: the_genomes,
+            errors: Option::None,
         };
     }
-
 
 
     fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
@@ -415,10 +399,7 @@ impl Graph {
     /// Prints the inputs, genomes and outputs for the graph to stdout
     fn print_graph(&self, graph_name: &str) {
         println!("\nGraph: {}", graph_name);
-        print!("Inputs: ");
-        for (i, input) in self.inputs.iter().enumerate() {
-            print!("{}: {}, ", i, input.get_input())
-        }
+        print!("Num_Inputs: {}, Layers_Back: {}", self.hyperparameters.num_inputs, self.hyperparameters.layers_back);
         print!("\nGenomes:");
         for (i, genome) in self.genomes.iter().enumerate() {
             println!("\n\tGenome {}: ", i);
@@ -437,7 +418,107 @@ impl Graph {
         }
         println!()
     }
-	
+
+    /// Evaluate the average of the mean-squared error or mean-absolute error for all genomes,
+    /// across a dataset of examples
+    fn evaluate_population_errors(&mut self, the_dataset: &dataset::Dataset, use_mean_squared: bool) -> PopulationErrors {
+        let mut population_errors: PopulationErrors = Vec::with_capacity(self.genomes.len());
+        for genome in self.genomes.iter() {
+            population_errors.push(genome.error_on_dataset(the_dataset, use_mean_squared, &self.functions));
+        }
+        return population_errors;
+    }
+
+    /// Select the genome with the lowest error out of all genomes
+    fn top_1_selection(&self) -> (&Genome, f64) {
+        let errors = self.errors.as_ref().unwrap();
+        //Best solution from the previous generation, if top-1 selection was in effect
+        let mut best_genome: &Genome = &self.genomes[0];
+        let mut lowest_error: f64 = errors[0];
+
+        for i in 1..self.genomes.len() {
+            //Prefer new, equally good solutions over the previous best solution
+            if errors[i] <= lowest_error {
+                best_genome = &self.genomes[i];
+                lowest_error = errors[i];
+            }
+        }
+        return (best_genome, lowest_error);
+    }
+
+    /// Select genome with the lowest error out of N random samples from all genomes
+    fn tournament_selection(&self, tournament_size: usize, random_generator: &mut ThreadRng) -> &Genome {
+        let errors = self.errors.as_ref().unwrap();
+        //Winner is the best out of N random samples
+        let mut winning_index: usize = random_generator.gen_range(0, self.genomes.len());
+        for i in 1..tournament_size {
+            let contender_index: usize = random_generator.gen_range(0, self.genomes.len());
+            if errors[contender_index] < errors[winning_index] {
+                winning_index = contender_index;
+            }
+        }
+        return &self.genomes[winning_index];
+    }
+
+    fn new_mutated_genome(&self, original: &Genome, num_mutations: usize, random_generator: &mut ThreadRng) -> Genome {
+        let mut mutated_solution: Genome = original.clone();
+        mutated_solution.mutate_nodes(
+            num_mutations,
+            self.hyperparameters.num_inputs,
+            self.hyperparameters.layers_back,
+            self.functions.len(),
+            random_generator
+        );
+        return mutated_solution;
+    }
+
+    /// Apply elitist top-1 selection or tournament selection to generate the next generation of
+    /// solutions. Returns the best solution from this new generation
+    fn next_generation(&mut self, the_dataset: &dataset::Dataset, tournament_size: usize, num_mutations: usize,  random_generator: &mut ThreadRng) -> (&Genome, f64) {
+        if self.errors.is_none() {
+            self.errors = Some(self.evaluate_population_errors(the_dataset, true));
+        }
+
+        let mut new_errors: PopulationErrors = Vec::with_capacity(self.genomes.len());
+        let mut new_genomes: Vec<Genome> = Vec::with_capacity(self.genomes.len());
+
+        let mut best_result: (&Genome, f64);
+
+        if tournament_size == 0 {
+            //Use elitist top-1 selection
+            let (parent, parent_error): (&Genome, f64) = self.top_1_selection();
+            println!("Lowest_error: {}", parent.error_on_dataset(&the_dataset, true, &self.functions));
+            new_genomes.push(parent.clone());
+            new_errors.push(parent_error);  //TODO: Will it update?
+
+            for i in 1..self.genomes.len() {
+                let child: Genome = self.new_mutated_genome(parent, num_mutations, random_generator);
+                let mutated_error: f64 = child.error_on_dataset(the_dataset, true, &self.functions);
+                new_genomes.push(child);
+                new_errors.push(mutated_error);
+            }
+        }
+        else {
+            //Use tournament selection
+            let mut intermediate_population: Vec<&Genome> = Vec::with_capacity(self.genomes.len());
+            for _ in 0..self.genomes.len() {
+                intermediate_population.push(self.tournament_selection(tournament_size, random_generator));
+            }
+            for parent in intermediate_population {
+                // Only point mutation is currently supported
+                let child = self.new_mutated_genome(parent, num_mutations, random_generator);
+                let child_error = child.error_on_dataset(the_dataset, true, &self.functions);
+                new_genomes.push(child);
+                new_errors.push(child_error);
+            }
+        }
+
+        self.genomes = new_genomes;
+        self.errors = Some(new_errors);
+        // Keep track of best solution so far
+        return self.top_1_selection();
+    }
+
 	/*
 	fn run(&self, expected_outputs: &Vec<f64>, muts: usize, layers_back: usize,rng: &mut ThreadRng) {
 		let mut max: f64 = 0.0;
@@ -456,7 +537,7 @@ impl Graph {
 			g = g.new_mutate_nodes(muts, self.inputs, layers_back, self.functions.len(), rng);
 		}
 	}
-	
+
 	*/
 
     /*
@@ -663,12 +744,12 @@ impl GraphBuilder {
 
 #[test]
 fn test_graph_on_dataset() {
-    let new_graph: Graph = Graph::new(
+    let mut new_graph: Graph = Graph::new(
         HyperParameters {
-            num_genomes: 3,
+            num_genomes: 10,
             num_inputs: 1,
-            num_layers: 3,
-            nodes_per_layer: 3,
+            num_layers: 10,
+            nodes_per_layer: 20,
             num_outputs: 1,
             layers_back: 2,
         },
@@ -683,10 +764,23 @@ fn test_graph_on_dataset() {
     for (i, genome) in new_graph.genomes.iter().enumerate() {
         println!("Genome {} MSE: {}", i, genome.error_on_dataset(&the_dataset, true, &new_graph.functions));
     }
+
+    for i in 0..2000 {
+        println!("i: {}", i);
+        new_graph.next_generation(&the_dataset, 0, 10, &mut rand::thread_rng());
+
+        //new_graph.print_graph("Updated");
+
+        for (i, genome) in new_graph.genomes.iter().enumerate() {
+            println!("Genome {} MSE: {}", i, genome.error_on_dataset(&the_dataset, true, &new_graph.functions));
+        }
+    }
+
 }
 
 #[test]
 fn test_graph() {
+    //Manually construct a graph
     let input1 = Node::InputNode(0.0);
     let input1_i = NodeIndex::InputIndex(0);
     let input2 = Node::InputNode(1.0);
@@ -716,19 +810,29 @@ fn test_graph() {
         output_layer: vec![input1_i, gene1_i, gene2_i],
     };
 
+    let the_inputs = vec![input1, input2];
+
     let the_graph = Graph {
-        inputs: vec![input1, input2],
+        //inputs: vec![input1, input2],
+        hyperparameters: HyperParameters {
+            num_genomes: 1,
+            num_inputs: 2,
+            num_layers: 1,
+            nodes_per_layer: 2,
+            num_outputs: 3,
+            layers_back: 1,
+        },
         functions: vec![op1, op2],
         genomes: vec![genome],
+        errors: None,
     };
 
-    let result1 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[0], &the_graph.inputs, &the_graph.functions);
-    let result2 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[1], &the_graph.inputs, &the_graph.functions);
-    let result3 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[2], &the_graph.inputs, &the_graph.functions);
+    let result1 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[0], &the_inputs, &the_graph.functions);
+    let result2 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[1], &the_inputs, &the_graph.functions);
+    let result3 = the_graph.genomes[0].evaluate_node(&the_graph.genomes[0].output_layer[2], &the_inputs, &the_graph.functions);
     assert_eq!(result1, 0.0);
     assert_eq!(result2, 2.0);
     assert_eq!(result3, -1.0);
-
 
     the_graph.print_graph("Initial");
 
@@ -736,6 +840,7 @@ fn test_graph() {
     new_graph.genomes[0].mutate_nodes(12, 2, 2, 4, &mut rand::thread_rng());
 
     new_graph.print_graph("Mutated");
+
 
     let gen_graph = Graph::new(
         HyperParameters {
