@@ -1,21 +1,24 @@
-extern crate csv; // CSV parsing
+extern crate csv; // for CSV parsing
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 
+///A series of input examples matched-up with output examples, for testing CGP genomes
 pub struct Dataset {
-    input_examples: Vec<f64>,
-    output_examples: Vec<f64>,
+    pub input_examples: Vec<f64>,
+    pub output_examples: Vec<f64>,
 }
 
-
-//TODO: Dataset is simple enough to not need CSV lib?
+///Extracts a dataset from a CSV, using a CSV library
 pub fn dataset_from_csv(filename: String) -> Dataset {
+    //Try and load the file
+    let mut reader = csv::Reader::from_file(filename).unwrap().has_headers(false);
+
     let mut the_dataset = Dataset {
         input_examples: Vec::new(),
         output_examples: Vec::new(),
     };
 
-    let mut reader = csv::Reader::from_file(filename).unwrap().has_headers(false);
+    //Extract CSV contents into dataset
     for record in reader.decode() {
         let (input_example, output_example): (f64, f64) = record.unwrap(); //Unwrapped replaces wrapped
 
@@ -26,19 +29,21 @@ pub fn dataset_from_csv(filename: String) -> Dataset {
     return the_dataset;
 }
 
-//TODO:...
-pub fn dataset_from_csv_nodepend(filename: String) -> Dataset {
-    let mut the_dataset = Dataset {
-        input_examples: Vec::new(),
-        output_examples: Vec::new(),
-    };
-
+///Extracts a dataset from a CSV, without using any dependencies
+pub fn dataset_from_csv_no_dependencies(filename: String) -> Dataset {
+    //Try and load the file
     let the_file = match File::open(&filename) {
         Ok(f) => f,
         Err(e) => panic!("Could not find file: {} \n{}", filename, e),
     };
     let the_reader = BufReader::new(the_file);
 
+    let mut the_dataset = Dataset {
+        input_examples: Vec::new(),
+        output_examples: Vec::new(),
+    };
+
+    //Extract CSV contents into dataset
     for line in the_reader.lines() {
         let mut examples = match line {
             Ok(ref l) => l.split(","),
@@ -50,37 +55,26 @@ pub fn dataset_from_csv_nodepend(filename: String) -> Dataset {
         the_dataset.output_examples.push(output_example);
         println!("({}, {})", input_example, output_example);
     }
-
     return the_dataset;
 }
 
-
-
-
-
+///Check that the data extractors work correctly on a test dataset
 #[test]
 fn test_dataset() {
     println!(file!());
-    {
-        let the_dataset = dataset_from_csv_nodepend(String::from("src\\sin.csv"));
-        assert_eq!(the_dataset.input_examples[0], 0.0);
-        assert_eq!(the_dataset.output_examples[0], 0.0);
+    let datasets = vec![
+        dataset_from_csv_no_dependencies(String::from("src\\sin.csv")),
+        dataset_from_csv(String::from("src\\sin.csv")),
+    ];
 
-        assert_eq!(the_dataset.input_examples[1], 0.1);
-        assert_eq!(the_dataset.output_examples[1], 0.0998334166468282);
+    for dataset in datasets {
+        assert_eq!(dataset.input_examples[0], 0.0);
+        assert_eq!(dataset.output_examples[0], 0.0);
 
-        assert_eq!(*the_dataset.input_examples.last().unwrap(), 6.2);
-        assert_eq!(*the_dataset.output_examples.last().unwrap(), -0.0830894028174964);
-    }
-    {
-        let the_dataset = dataset_from_csv(String::from("src\\sin.csv"));
-        assert_eq!(the_dataset.input_examples[0], 0.0);
-        assert_eq!(the_dataset.output_examples[0], 0.0);
+        assert_eq!(dataset.input_examples[1], 0.1);
+        assert_eq!(dataset.output_examples[1], 0.0998334166468282);
 
-        assert_eq!(the_dataset.input_examples[1], 0.1);
-        assert_eq!(the_dataset.output_examples[1], 0.0998334166468282);
-
-        assert_eq!(*the_dataset.input_examples.last().unwrap(), 6.2);
-        assert_eq!(*the_dataset.output_examples.last().unwrap(), -0.0830894028174964);
+        assert_eq!(*dataset.input_examples.last().unwrap(), 6.2);
+        assert_eq!(*dataset.output_examples.last().unwrap(), -0.0830894028174964);
     }
 }

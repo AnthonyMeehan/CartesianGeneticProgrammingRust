@@ -1,15 +1,12 @@
 extern crate rand; // Random number generators
 
-
-
-
 mod graph;
-mod nodes;
-mod fitness_fns;
+mod operations;
+mod dataset;
 
 #[cfg(test)]
 mod tests {
-    use fitness_fns;
+    use dataset;
     use graph;
 
     #[test]
@@ -31,12 +28,6 @@ mod tests {
         let minus_one: f64 = -1.0;
         assert!(fitness_fns::sin(1.0) == minus_one.sin());
     }*/
-
-
-
-
-
-
 
 
 }
