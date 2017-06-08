@@ -43,9 +43,9 @@ fn main() {
 	// With the graph set, now we can run it!
 	// Use the arguments
 	// num_iterations: usize , the number of iterations to run for
-	// display_progress: bool , if true, displays errors as graph is run
+	// display_progress: bool , if true, displays error progression as graph is run
 	// the_dataset: &dataset::Dataset , a reference to the dataset
-	// tournament_size: usize , the size of the tournament selection
+	// tournament_size: usize , the size of the tournament selection, or elitist selection if 0
 	// num_mutations: usize , number of mutations per mutate
 	// random_generator: &mut ThreadRng , the rng
 	

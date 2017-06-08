@@ -6,9 +6,6 @@ pub mod dataset;
 
 #[cfg(test)]
 mod tests {
-    use dataset;
-    use graph;
-
     #[test]
     fn it_works() {
     }

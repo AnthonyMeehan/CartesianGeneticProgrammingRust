@@ -75,7 +75,7 @@ impl Genome {
         for i in 0..genome_parameters.num_layers {
             let mut inner_layer: Layer = Vec::with_capacity(genome_parameters.nodes_per_layer);
             //Add random valid nodes
-            for j in 0..genome_parameters.nodes_per_layer {
+            for _ in 0..genome_parameters.nodes_per_layer {
                 inner_layer.push(Node::GeneNode(GeneNode {
                     function: random_generator.gen_range(0, num_functions),
                     input_node_one: (Genome::get_random_node_from_layers(&the_inner_layers, i, genome_parameters.num_inputs, genome_parameters.layers_back, random_generator)),
@@ -87,7 +87,7 @@ impl Genome {
 
         //Add valid outputs
         let mut the_output_layer: Vec<NodeIndex> = Vec::new();
-        for i in 0..genome_parameters.num_outputs {
+        for _ in 0..genome_parameters.num_outputs {
             the_output_layer.push(Genome::get_random_node_from_layers(&the_inner_layers, the_inner_layers.len(), genome_parameters.num_inputs, genome_parameters.layers_back, random_generator));
         }
 
@@ -121,7 +121,7 @@ impl Genome {
     /// i.e. when dealing with the output_layer.
     fn get_random_node_from_slice(inner_layers: &[Layer], from_layer: usize, num_inputs: usize, layers_back: usize, random_generator: &mut ThreadRng) -> NodeIndex {
         assert!(layers_back > 0, "layers_back must be greater than 0");
-        assert!(from_layer >= 0, "from_layer must be greater than or equal to 0");
+        //assert!(from_layer >= 0, "from_layer must be greater than or equal to 0");
         assert!(from_layer <= inner_layers.len(), "from_layer must be less than or equal to number of function_layers");
 
         //If layers_back > from_layer, counteract bias towards input nodes
@@ -141,8 +141,6 @@ impl Genome {
     }
 
     fn mutate_node(&mut self, num_inputs: usize, layers_back: usize, output_probability: f64, num_functions: usize, random_generator: &mut ThreadRng) {
-        let layer_index: usize = random_generator.gen_range(0, self.inner_layers.len()+1);
-
         if random_generator.gen_range(0.0, 1.0) < output_probability {
             //mutate an output connection
             let output_index: usize = random_generator.gen_range(0, self.output_layer.len());
@@ -294,11 +292,11 @@ impl Graph {
 
         //Initialise inputs to empty values
         let mut initial_inputs: Layer = Vec::with_capacity(genome_parameters.num_inputs);
-        for i in 0..genome_parameters.num_inputs {
+        for _ in 0..genome_parameters.num_inputs {
             initial_inputs.push(Node::InputNode(0.0));
         }
 
-        for i in 0..genome_parameters.num_genomes {
+        for _ in 0..genome_parameters.num_genomes {
             the_genomes.push(Genome::new(&genome_parameters, the_functions.len(), random_generator));
         }
 
@@ -309,11 +307,6 @@ impl Graph {
             genomes: the_genomes,
             errors: Option::None,
         };
-    }
-
-
-    fn get_random_fn(&self, random_generator: &mut ThreadRng) -> FunctionIndex {
-        return random_generator.gen_range(0, self.functions.len());
     }
 
     /// Prints the inputs, genomes and outputs for the graph to stdout
@@ -371,7 +364,7 @@ impl Graph {
         let errors = self.errors.as_ref().unwrap();
         //Winner is the best out of N random samples
         let mut winning_index: usize = random_generator.gen_range(0, self.genomes.len());
-        for i in 1..tournament_size {
+        for _ in 1..tournament_size {
             let contender_index: usize = random_generator.gen_range(0, self.genomes.len());
             if errors[contender_index] < errors[winning_index] {
                 winning_index = contender_index;
@@ -403,8 +396,6 @@ impl Graph {
         let mut new_errors: PopulationErrors = Vec::with_capacity(self.genomes.len());
         let mut new_genomes: Vec<Genome> = Vec::with_capacity(self.genomes.len());
 
-        let mut best_result: (&Genome, f64);
-
         if tournament_size == 0 {
             //Use elitist top-1 selection
             let (parent, parent_error): (&Genome, f64) = self.top_1_selection();
@@ -412,7 +403,7 @@ impl Graph {
             new_genomes.push(parent.clone());
             new_errors.push(parent_error);
 
-            for i in 1..self.genomes.len() {
+            for _ in 1..self.genomes.len() {
                 let child: Genome = self.new_mutated_genome(parent, num_mutations, random_generator);
                 let mutated_error: f64 = child.error_on_dataset(the_dataset, true, &self.functions);
                 new_genomes.push(child);
@@ -450,7 +441,7 @@ impl Graph {
         let mut lowest_error;
         //Isolate borrow to this scope
         {
-            let (mut first_genome, mut first_error): (&Genome, f64) = self.top_1_selection();
+            let (first_genome, first_error): (&Genome, f64) = self.top_1_selection();
             best_genome = first_genome.clone();
             lowest_error = first_error;
         }
@@ -480,7 +471,7 @@ impl Graph {
                 if log_result > last_int_log_result {
                     last_int_log_result = log_result;
                     print!(".");
-                    stdout().flush();
+                    stdout().flush().unwrap();
                 }
             }
         }
