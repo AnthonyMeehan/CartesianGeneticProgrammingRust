@@ -13,7 +13,7 @@ type Layer = Vec<Node>;
 type PopulationErrors = Vec<f64>;
 
 #[derive(Clone, Copy, Debug)]
-enum NodeIndex {
+pub enum NodeIndex {
     InputIndex(usize),
     GeneIndex(usize, usize),
 }
@@ -62,7 +62,7 @@ impl Node {
 }
 
 #[derive(Clone, Debug)]
-struct Genome {
+pub struct Genome {
     inner_layers: Vec<Layer>,
     output_layer: Vec<NodeIndex>, //TODO: was just 'Layer' before
 }
@@ -348,26 +348,26 @@ impl Genome {
 }
 
 #[derive(Clone, Debug)]
-struct HyperParameters {
-    num_genomes: usize,
-    num_inputs: usize,
-    num_layers: usize,
-    nodes_per_layer: usize,
-    num_outputs: usize,
-    layers_back: usize,
+pub struct HyperParameters {
+    pub num_genomes: usize,
+    pub num_inputs: usize,
+    pub num_layers: usize,
+    pub nodes_per_layer: usize,
+    pub num_outputs: usize,
+    pub layers_back: usize,
 }
 
 /// The Graph struct containing the list of genes, and the inputs to the Graph,
 /// as well as a list of functions to be used as nodes
 #[derive(Clone, Debug)]
-struct Graph {
+pub struct Graph {
     //dataset: dataset::Dataset,
     //inputs: Layer,
     //TODO: constants: Vec<f64>,
-    hyperparameters: HyperParameters,
-    functions: Vec<BiFunction>,
-    genomes: Vec<Genome>,
-    errors: Option<PopulationErrors>,
+    pub hyperparameters: HyperParameters,
+    pub functions: Vec<BiFunction>,
+    pub genomes: Vec<Genome>,
+    pub errors: Option<PopulationErrors>,
 }
 
 impl Graph {
@@ -399,7 +399,7 @@ impl Graph {
     }
 
     /// Prints the inputs, genomes and outputs for the graph to stdout
-    fn print_graph(&self, graph_name: &str) {
+    pub fn print_graph(&self, graph_name: &str) {
         println!("\nGraph: {}", graph_name);
         print!("Num_Inputs: {}, Layers_Back: {}", self.hyperparameters.num_inputs, self.hyperparameters.layers_back);
         print!("\nGenomes:");
@@ -523,7 +523,7 @@ impl Graph {
     }
 
 
-    fn run(&mut self, num_iterations: usize, display_progress: bool, the_dataset: &dataset::Dataset, tournament_size: usize, num_mutations: usize, random_generator: &mut ThreadRng) -> (Genome, f64) {
+    pub fn run(&mut self, num_iterations: usize, display_progress: bool, the_dataset: &dataset::Dataset, tournament_size: usize, num_mutations: usize, random_generator: &mut ThreadRng) -> (Genome, f64) {
         if self.errors.is_none() {
             self.errors = Some(self.evaluate_population_errors(the_dataset, true));
         }

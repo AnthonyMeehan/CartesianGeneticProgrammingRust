@@ -5,3 +5,5 @@ authors = ["thegoldencanary <thegoldencanary8@gmail.com>"]
 
 [dependencies]
 cgp_rs = {path = "..//cgprs"}
+rand = "0.3.15"
+csv = "0.15.0"

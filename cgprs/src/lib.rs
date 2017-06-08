@@ -1,8 +1,8 @@
 extern crate rand; // Random number generators
 
-mod graph;
-mod operations;
-mod dataset;
+pub mod graph;
+pub mod operations;
+pub mod dataset;
 
 #[cfg(test)]
 mod tests {
